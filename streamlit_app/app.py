@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 import json
 import html
 import re
+import csv
+import sys
 from datetime import datetime
 
 # ---------------- PAGE CONFIG ----------------
@@ -23,6 +25,14 @@ client = Groq(
 
 MAX_ATTACHMENT_PREVIEW_ROWS = 10
 MAX_ATTACHMENT_SUMMARY_CHARS = 12000
+
+
+def ensure_workspace_packages():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    site_packages = os.path.join(project_root, "venv", "Lib", "site-packages")
+
+    if os.path.isdir(site_packages) and site_packages not in sys.path:
+        sys.path.insert(0, site_packages)
 
 
 def get_ticket_topic(ticket_content):
@@ -118,13 +128,116 @@ def summarize_dataframe(df, source_name):
     return "\n".join(summary)
 
 
+def summarize_table(headers, rows, source_name, total_rows=None):
+    headers = [str(header) if header is not None else "" for header in headers]
+    rows = [
+        ["" if value is None else str(value) for value in row]
+        for row in rows
+    ]
+    row_count = total_rows if total_rows is not None else len(rows)
+    summary = [
+        f"Source: {source_name}",
+        f"Rows: {row_count}",
+        f"Columns: {', '.join(headers)}",
+    ]
+    interesting_columns = get_interesting_columns(headers)
+
+    if interesting_columns:
+        summary.append(
+            "Likely QA-relevant columns: " + ", ".join(interesting_columns)
+        )
+
+        for column in interesting_columns[:6]:
+            column_index = headers.index(column)
+            values = []
+
+            for row in rows:
+                if column_index < len(row):
+                    value = row[column_index].strip()
+
+                    if value and value not in values:
+                        values.append(value)
+
+                if len(values) >= 8:
+                    break
+
+            if values:
+                summary.append(
+                    f"Sample values for {column}: {', '.join(values)}"
+                )
+
+    if rows:
+        summary.append("Preview rows:")
+        summary.append("\t".join(headers))
+
+        for row in rows[:MAX_ATTACHMENT_PREVIEW_ROWS]:
+            padded_row = row + [""] * max(0, len(headers) - len(row))
+            summary.append("\t".join(padded_row[:len(headers)]))
+
+    return "\n".join(summary)
+
+
+def read_csv_fallback(file_path):
+    with open(file_path, "r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.reader(file)
+        headers = next(reader, [])
+        rows = []
+
+        for index, row in enumerate(reader):
+            if index < 50:
+                rows.append(row)
+
+        total_rows = index + 1 if "index" in locals() else 0
+
+    return summarize_table(headers, rows, "CSV", total_rows)
+
+
+def read_excel_fallback(file_path):
+    ensure_workspace_packages()
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(file_path, read_only=True, data_only=True)
+    sheet_blocks = []
+
+    for sheet in workbook.worksheets:
+        rows_iterator = sheet.iter_rows(values_only=True)
+        headers = next(rows_iterator, [])
+        rows = []
+
+        for index, row in enumerate(rows_iterator):
+            if index < 50:
+                rows.append(list(row))
+
+        total_rows = max((sheet.max_row or (len(rows) + 1)) - 1, 0)
+        sheet_blocks.append(
+            summarize_table(headers, rows, f"Sheet: {sheet.title}", total_rows)
+        )
+
+    workbook.close()
+    return "\n\n".join(sheet_blocks)
+
+
 @st.cache_data(show_spinner=False)
 def build_attachment_content_summary(attachments):
-    import pandas as pd
+    ensure_workspace_packages()
+
+    try:
+        import pandas as pd
+        pandas_error = None
+    except Exception as error:
+        pd = None
+        pandas_error = error
 
     summary_blocks = []
     parsed_files = 0
     unsupported_files = []
+
+    if pandas_error:
+        summary_blocks.append(
+            "Pandas could not be loaded in this environment, so the app used "
+            "a lightweight fallback reader for Excel/CSV parsing."
+        )
 
     for attachment in attachments:
         file_path = os.path.join("attachments", attachment)
@@ -132,25 +245,46 @@ def build_attachment_content_summary(attachments):
 
         try:
             if extension in [".xlsx", ".xls"]:
-                excel_file = pd.ExcelFile(file_path)
-                sheet_blocks = [f"File: {attachment}"]
+                if pd is not None:
+                    excel_file = pd.ExcelFile(file_path)
+                    sheet_blocks = [f"File: {attachment}"]
 
-                for sheet_name in excel_file.sheet_names:
-                    df = pd.read_excel(file_path, sheet_name=sheet_name)
-                    sheet_blocks.append(
-                        summarize_dataframe(df, f"Sheet: {sheet_name}")
+                    for sheet_name in excel_file.sheet_names:
+                        df = pd.read_excel(file_path, sheet_name=sheet_name)
+                        sheet_blocks.append(
+                            summarize_dataframe(df, f"Sheet: {sheet_name}")
+                        )
+
+                    summary_blocks.append("\n\n".join(sheet_blocks))
+                elif extension == ".xlsx":
+                    summary_blocks.append(
+                        "\n".join([
+                            f"File: {attachment}",
+                            read_excel_fallback(file_path),
+                        ])
                     )
+                else:
+                    unsupported_files.append(attachment)
+                    continue
 
-                summary_blocks.append("\n\n".join(sheet_blocks))
                 parsed_files += 1
             elif extension == ".csv":
-                df = pd.read_csv(file_path)
-                summary_blocks.append(
-                    "\n".join([
-                        f"File: {attachment}",
-                        summarize_dataframe(df, "CSV"),
-                    ])
-                )
+                if pd is not None:
+                    df = pd.read_csv(file_path)
+                    summary_blocks.append(
+                        "\n".join([
+                            f"File: {attachment}",
+                            summarize_dataframe(df, "CSV"),
+                        ])
+                    )
+                else:
+                    summary_blocks.append(
+                        "\n".join([
+                            f"File: {attachment}",
+                            read_csv_fallback(file_path),
+                        ])
+                    )
+
                 parsed_files += 1
             else:
                 unsupported_files.append(attachment)
@@ -614,7 +748,7 @@ if ticket_attachments:
             ) = build_attachment_content_summary(tuple(ticket_attachments))
 
         if attachment_summary:
-            st.markdown("#### Attachment Content Summary")
+        st.markdown("#### Attachment Content Summary")
             st.caption(
                 f"Parsed tabular files: {parsed_attachment_count} | "
                 f"Unsupported files: {unsupported_attachment_count}"
