@@ -492,11 +492,86 @@ def render_ai_analysis(response):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def calculate_confidence_score(
+    ticket_content,
+    attachment_count,
+    attachment_summary,
+    has_historical_context
+):
+    score = 48
+    ticket_length = len(ticket_content.strip())
+
+    if ticket_content and ticket_content != "Ticket not found.":
+        score += min(ticket_length // 80, 22)
+
+    if attachment_count:
+        score += 10
+
+    if attachment_summary:
+        score += 14
+
+    if has_historical_context:
+        score += 8
+
+    return max(35, min(score, 95))
+
+
+def get_data_sources_used(
+    ticket_content,
+    attachments,
+    attachment_summary,
+    has_historical_context
+):
+    sources = []
+
+    if ticket_content and ticket_content != "Ticket not found.":
+        sources.append("Jira Ticket")
+
+    if any(
+        os.path.splitext(attachment)[1].lower() in [".xlsx", ".xls", ".csv"]
+        for attachment in attachments
+    ):
+        sources.append("Excel Attachment")
+
+    if attachment_summary:
+        sources.append("Parsed Document")
+
+    if has_historical_context:
+        sources.append("Historical Investigation")
+
+    return sources
+
+
+def render_grounding_panel(confidence_score, data_sources):
+    source_items = "".join(
+        f"<li>✓ {html.escape(source)}</li>"
+        for source in data_sources
+    )
+
+    st.markdown(
+        f"""
+        <div class="grounding-grid">
+            <section class="grounding-card confidence-card">
+                <span>Confidence Level</span>
+                <strong>{confidence_score}%</strong>
+            </section>
+            <section class="grounding-card sources-card">
+                <span>Sources Used</span>
+                <ul>{source_items}</ul>
+            </section>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 # ---------------- SIDEBAR ----------------
 
 st.sidebar.title("QA AI Assistant")
 
 st.sidebar.markdown("## 📌 Investigation History")
+
+history = []
 
 try:
     with open("chat_history/history.json", "r", encoding="utf-8") as file:
@@ -546,6 +621,12 @@ try:
                         st.markdown("**Question**")
                         st.write(question)
 
+                        if item.get("confidence_score") and item.get("data_sources"):
+                            render_grounding_panel(
+                                item["confidence_score"],
+                                item["data_sources"]
+                            )
+
                         st.markdown("**AI Analysis**")
                         render_ai_analysis(response)
 
@@ -557,10 +638,7 @@ except:
 
 # ---------------- MAIN UI ----------------
 
-banner_left, banner_center, banner_right = st.columns([1, 2, 1])
-
-with banner_center:
-    st.image("banner.png", width=520)
+st.image("banner.png", use_container_width=True)
 
 st.title("🔎 QA AI Impact Analysis Assistant")
 
@@ -633,6 +711,45 @@ st.markdown(
         padding: 0.08rem 0.28rem;
     }
 
+    .grounding-grid {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.65fr) minmax(260px, 1.35fr);
+        gap: 0.85rem;
+        margin: 0.75rem 0 1rem 0;
+    }
+
+    .grounding-card {
+        border: 1px solid rgba(125, 211, 252, 0.34);
+        border-radius: 8px;
+        background: rgba(14, 165, 233, 0.12);
+        padding: 0.9rem 1rem;
+    }
+
+    .grounding-card span {
+        color: #bae6fd;
+        display: block;
+        font-size: 0.92rem;
+        font-weight: 700;
+        margin-bottom: 0.35rem;
+    }
+
+    .confidence-card strong {
+        color: #f8fafc;
+        font-size: 2rem;
+        line-height: 1;
+    }
+
+    .sources-card ul {
+        color: #e2e8f0;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .sources-card li {
+        margin-bottom: 0.25rem;
+    }
+
     div[data-testid="stButton"] > button {
         height: 3.2rem;
         width: 100%;
@@ -677,6 +794,14 @@ st.markdown(
 
     section[data-testid="stSidebar"] .qa-analysis-body {
         font-size: 0.92rem;
+    }
+
+    section[data-testid="stSidebar"] .grounding-grid {
+        grid-template-columns: 1fr;
+    }
+
+    section[data-testid="stSidebar"] .confidence-card strong {
+        font-size: 1.45rem;
     }
 
     .attachment-summary {
@@ -857,6 +982,23 @@ if st.button("Analyze Impact"):
 
         st.session_state.attachment_summary_by_ticket = attachment_summary
 
+    has_historical_context = any(
+        item.get("ticket") == ticket
+        for item in history
+    )
+    confidence_score = calculate_confidence_score(
+        ticket_content,
+        attachment_count,
+        attachment_summary,
+        has_historical_context
+    )
+    data_sources = get_data_sources_used(
+        ticket_content,
+        ticket_attachments,
+        attachment_summary,
+        has_historical_context
+    )
+
     # Empty question validation
     if not question.strip():
         st.warning("Please enter a question.")
@@ -958,7 +1100,9 @@ if st.button("Analyze Impact"):
         "ticket": ticket,
         "topic": ticket_topic,
         "question": question,
-        "response": ai_response
+        "response": ai_response,
+        "confidence_score": confidence_score,
+        "data_sources": data_sources
     }
 
     history_file = "chat_history/history.json"
@@ -974,4 +1118,5 @@ if st.button("Analyze Impact"):
     with open(history_file, "w", encoding="utf-8") as file:
         json.dump(history, file, indent=4)
 
+    render_grounding_panel(confidence_score, data_sources)
     render_ai_analysis(ai_response)

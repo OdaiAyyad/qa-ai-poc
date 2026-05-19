@@ -38,5 +38,19 @@
         "topic": "BE - Scholarship Reset Migration / Part 2",
         "question": "What should I regression test?",
         "response": "## Affected Areas\n- Student scholarship status updates\n- Order cancellations related to scholarship codes\n- Scholarship code discount value updates\n- Student re-application for scholarships\n\n## Important DB Checks\n- `scholarships` table: updates to `status`, `discount_amount`, and `code` columns\n- `orders` table: cancellations of orders linked to scholarship codes\n- `students` table: updates to student records, including scholarship status and code information\n- `scholarship_codes` table: updates to code values and discount amounts\n\n## Risky Dependencies\n- Order cancellation logic: potential impact on related orders or financial transactions\n- Scholarship code generation: potential conflicts with existing codes or discounts\n- Student re-application logic: potential issues with eligibility checks or scholarship allocation\n\n## Suggested Investigation\n- Review the migration script to ensure correct updates to student records and scholarship codes\n- Verify that order cancellations are properly handled and do not affect other related orders\n- Investigate potential hidden dependencies between scholarship codes, student records, and order cancellations\n\n## Regression Focus\n- Test student scholarship status updates and order cancellations\n- Verify that scholarship code discount values are updated correctly\n- Test student re-application for scholarships with updated codes and discounts\n- Check for potential issues with order cancellations, such as incorrect cancellation or effects on related orders\n- Validate that the migration script correctly handles different scenarios, including edge cases and error handling"
+    },
+    {
+        "timestamp": "2026-05-20T01:49:27",
+        "ticket": "STF-7063",
+        "topic": "BE - Scholarship Reset Migration",
+        "question": "What DB columns may be affected?",
+        "response": "## Affected Areas\n- Student scholarship status\n- Order cancellation linked to scholarship codes\n- Scholarship code discount values\n- Student eligibility for reapplying for scholarships\n\n## Important DB Checks\n- `scholarships` table: columns like `id`, `status`, `scholarship_type_id`, `area_id`, `scholarship_gift_id`\n- `orders` table: columns related to order cancellation status\n- `students` table: columns related to student information and eligibility for scholarships\n- `scholarship_codes` table: columns related to scholarship code discount values\n\n## Risky Dependencies\n- Existing orders linked to scholarship codes\n- Scholarship code discount value updates affecting student eligibility\n- Student status updates affecting their ability to reapply for scholarships\n\n## Suggested Investigation\n- Investigate the relationship between `scholarships`, `orders`, and `students` tables\n- Verify the logic for canceling orders linked to scholarship codes\n- Test the update of scholarship code discount values and its impact on student eligibility\n- Check for any potential hidden dependencies between tables or business logic rules\n\n## Regression Focus\n- Previous functionality related to student scholarship applications and order management\n- Existing business logic for handling scholarship code discounts and student eligibility\n- Integration points with other systems that may be affected by changes to scholarship status or order cancellation",
+        "confidence_score": 92,
+        "data_sources": [
+            "Jira Ticket",
+            "Excel Attachment",
+            "Parsed Document",
+            "Historical Investigation"
+        ]
     }
 ]
