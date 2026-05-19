@@ -497,6 +497,20 @@ def render_section_body(content):
     return "\n".join(html_lines)
 
 
+def render_analysis_card(title, content):
+    st.markdown(
+        f"""
+        <section class="qa-analysis-card">
+            <h4>{SECTION_ICONS.get(title, "•")} {html.escape(title)}</h4>
+            <div class="qa-analysis-body">
+                {render_section_body(content)}
+            </div>
+        </section>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def render_ai_analysis(response):
     sections = parse_analysis_sections(response)
 
@@ -504,27 +518,35 @@ def render_ai_analysis(response):
         st.markdown(response)
         return
 
-    st.markdown('<div class="qa-analysis-grid">', unsafe_allow_html=True)
+    tab_config = [
+        ("Impact", ["Affected Areas", "DB Checks", "Risky Dependencies"]),
+        ("QA Scenarios", ["Suggested Test Scenarios", "Regression Focus"]),
+        ("SQL", ["Suggested SQL Queries"]),
+        ("Investigation", ["Suggested Investigation"]),
+    ]
+    visible_tabs = [
+        (label, section_titles)
+        for label, section_titles in tab_config
+        if any(sections.get(section_title) for section_title in section_titles)
+    ]
 
-    for title, _ in ANALYSIS_SECTIONS:
-        content = sections.get(title)
+    if not visible_tabs:
+        st.markdown(response)
+        return
 
-        if not content:
-            continue
+    tabs = st.tabs([label for label, _ in visible_tabs])
 
-        st.markdown(
-            f"""
-            <section class="qa-analysis-card">
-                <h4>{SECTION_ICONS.get(title, "•")} {html.escape(title)}</h4>
-                <div class="qa-analysis-body">
-                    {render_section_body(content)}
-                </div>
-            </section>
-            """,
-            unsafe_allow_html=True
-        )
+    for tab, (_, section_titles) in zip(tabs, visible_tabs):
+        with tab:
+            st.markdown('<div class="qa-analysis-grid">', unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+            for title in section_titles:
+                content = sections.get(title)
+
+                if content:
+                    render_analysis_card(title, content)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
 
 def calculate_confidence_score(
@@ -602,78 +624,79 @@ def render_grounding_panel(confidence_score, data_sources):
 
 # ---------------- SIDEBAR ----------------
 
+st.sidebar.image("banner.png", use_container_width=True)
 st.sidebar.title("QA AI Assistant")
-
-st.sidebar.markdown("## 📌 Investigation History")
 
 history = []
 
 try:
     with open("chat_history/history.json", "r", encoding="utf-8") as file:
         history = json.load(file)
+except:
+    history = []
 
-        if not history:
-            st.sidebar.write("No history yet.")
 
-        history_groups = build_history_groups(history)
+def render_history_sidebar(history_items):
+    st.sidebar.markdown("## 📌 Investigation History")
 
-        sorted_groups = sorted(
-            history_groups.values(),
-            key=lambda group: max(
-                parse_timestamp(item.get("timestamp", ""))
-                for item in group["items"]
-            ),
+    if not history_items:
+        st.sidebar.write("No history yet.")
+        st.sidebar.markdown("- Scholarship")
+        st.sidebar.markdown("- Orders")
+        st.sidebar.markdown("- Discounts")
+        return
+
+    history_groups = build_history_groups(history_items)
+
+    sorted_groups = sorted(
+        history_groups.values(),
+        key=lambda group: max(
+            parse_timestamp(item.get("timestamp", ""))
+            for item in group["items"]
+        ),
+        reverse=True
+    )
+
+    for group in sorted_groups:
+        ticket_id = group["ticket"]
+        topic = group["topic"]
+        searches = sorted(
+            group["items"],
+            key=lambda item: parse_timestamp(item.get("timestamp", "")),
             reverse=True
         )
+        search_count = len(searches)
+        group_title = f"{ticket_id} - {topic}"
 
-        for group in sorted_groups:
-            ticket_id = group["ticket"]
-            topic = group["topic"]
-            searches = sorted(
-                group["items"],
-                key=lambda item: parse_timestamp(item.get("timestamp", "")),
-                reverse=True
-            )
-            search_count = len(searches)
-            group_title = f"{ticket_id} - {topic}"
+        if len(group_title) > 42:
+            group_title = f"{group_title[:42]}..."
 
-            if len(group_title) > 48:
-                group_title = f"{group_title[:48]}..."
+        with st.sidebar.expander(f"{group_title} ({search_count})"):
+            tab_labels = [f"Search {index + 1}" for index in range(search_count)]
+            tabs = st.tabs(tab_labels)
 
-            with st.sidebar.expander(f"{group_title} ({search_count})"):
-                tab_labels = [f"Search {index + 1}" for index in range(search_count)]
-                tabs = st.tabs(tab_labels)
+            for tab, item in zip(tabs, searches):
+                with tab:
+                    timestamp = format_timestamp(item.get("timestamp", ""))
+                    question = item.get("question", "No question")
+                    response = item.get("response", "No response saved.")
 
-                for tab, item in zip(tabs, searches):
-                    with tab:
-                        timestamp = format_timestamp(item.get("timestamp", ""))
-                        question = item.get("question", "No question")
-                        response = item.get("response", "No response saved.")
+                    if timestamp:
+                        st.caption(timestamp)
 
-                        if timestamp:
-                            st.caption(timestamp)
+                    st.markdown("**Question**")
+                    st.write(question)
 
-                        st.markdown("**Question**")
-                        st.write(question)
+                    if item.get("confidence_score") and item.get("data_sources"):
+                        render_grounding_panel(
+                            item["confidence_score"],
+                            item["data_sources"]
+                        )
 
-                        if item.get("confidence_score") and item.get("data_sources"):
-                            render_grounding_panel(
-                                item["confidence_score"],
-                                item["data_sources"]
-                            )
-
-                        st.markdown("**AI Analysis**")
-                        render_ai_analysis(response)
-
-except:
-    st.sidebar.write("No history yet.")
-    st.sidebar.markdown("- Scholarship")
-    st.sidebar.markdown("- Orders")
-    st.sidebar.markdown("- Discounts")
+                    st.markdown("**AI Analysis**")
+                    render_ai_analysis(response)
 
 # ---------------- MAIN UI ----------------
-
-st.image("banner.png", use_container_width=True)
 
 st.title("🔎 QA AI Impact Analysis Assistant")
 
@@ -704,7 +727,7 @@ st.markdown(
 
     .qa-analysis-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 0.85rem;
         margin-top: 0.5rem;
     }
@@ -821,6 +844,21 @@ st.markdown(
         color: #082f49;
     }
 
+    div[data-testid="stButton"] > button[kind="primary"] {
+        height: 3.35rem;
+        border: 1px solid #22d3ee;
+        background: linear-gradient(180deg, #0891b2 0%, #0e7490 100%);
+        color: #ffffff;
+        font-size: 1.02rem;
+        box-shadow: 0 12px 24px rgba(8, 145, 178, 0.28);
+    }
+
+    div[data-testid="stButton"] > button[kind="primary"]:hover {
+        border-color: #67e8f9;
+        background: linear-gradient(180deg, #06b6d4 0%, #0891b2 100%);
+        color: #ffffff;
+    }
+
     section[data-testid="stSidebar"] {
         min-width: 22rem;
         border-right: 1px solid rgba(125, 211, 252, 0.2);
@@ -828,6 +866,19 @@ st.markdown(
 
     section[data-testid="stSidebar"] [data-testid="stExpander"] {
         background: rgba(30, 41, 59, 0.9);
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] details {
+        padding: 0;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        font-size: 0.9rem;
+        line-height: 1.25;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stImage"] {
+        margin-bottom: 0.4rem;
     }
 
     section[data-testid="stSidebar"] .qa-analysis-grid {
@@ -881,6 +932,17 @@ st.markdown(
     .sidebar-context-card strong {
         color: #7dd3fc;
     }
+
+    .context-row {
+        display: grid;
+        grid-template-columns: 6.25rem 1fr;
+        gap: 0.45rem;
+        margin-bottom: 0.35rem;
+    }
+
+    .context-row:last-child {
+        margin-bottom: 0;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -913,13 +975,15 @@ attachment_summary = ""
 parsed_attachment_count = 0
 unsupported_attachment_count = 0
 
+render_history_sidebar(history)
+
 st.sidebar.markdown("## Ticket Context")
 st.sidebar.markdown(
     f"""
     <div class="sidebar-context-card">
-        <div><strong>Ticket:</strong> {html.escape(ticket)}</div>
-        <div><strong>Environment:</strong> {html.escape(environment)}</div>
-        <div><strong>Attachments:</strong> {attachment_count}</div>
+        <div class="context-row"><strong>Ticket</strong><span>{html.escape(ticket)}</span></div>
+        <div class="context-row"><strong>Env</strong><span>{html.escape(environment)}</span></div>
+        <div class="context-row"><strong>Attachments</strong><span>{attachment_count}</span></div>
     </div>
     """,
     unsafe_allow_html=True
@@ -1008,7 +1072,7 @@ question = st.text_area(
 
 # ---------------- BUTTON ----------------
 
-if st.button("Analyze Impact"):
+if st.button("Analyze Impact", type="primary", use_container_width=True):
 
     ticket_content = ""
 

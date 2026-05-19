@@ -77,5 +77,19 @@
             "Excel Attachment",
             "Parsed Document"
         ]
+    },
+    {
+        "timestamp": "2026-05-20T02:05:41",
+        "ticket": "STF-7063",
+        "topic": "BE - Scholarship Reset Migration",
+        "question": "What DB columns may be affected?",
+        "response": "## Affected Areas\n- Student scholarships table\n- Orders table linked to scholarship codes\n- Student information table for updating scholarship status\n- Scholarship codes table for updating discount values\n\n## Important DB Checks\n- Existence of students in the provided sheet\n- Current scholarship status and codes for each student\n- Existing orders linked to scholarship codes\n- Database constraints and triggers related to scholarships and orders\n\n## Risky Dependencies\n- Logic for canceling existing orders linked to scholarship codes\n- Logic for updating student scholarship status and codes\n- Dependencies between student information, scholarship codes, and orders\n\n## Suggested Investigation\n- Investigate how the migration file will handle students with multiple scholarship codes\n- Investigate how the migration file will handle students with no existing orders linked to scholarship codes\n- Investigate potential data inconsistencies after the migration\n\n## Suggested Test Scenarios\n- Test a student with a single scholarship code and an existing order\n- Test a student with multiple scholarship codes and existing orders\n- Test a student with no existing orders linked to scholarship codes\n- Test a student who has already reapplied for a scholarship\n- Test a student who is not included in the provided sheet\n\n## Suggested SQL Queries\n- Purpose: Check student information and current scholarship status\n```sql\nSELECT * FROM students \nJOIN scholarships ON students.id = scholarships.student_id \nWHERE students.id IN (SELECT id FROM provided_sheet);\n```\n- Purpose: Check existing orders linked to scholarship codes\n```sql\nSELECT * FROM orders \nJOIN scholarships ON orders.scholarship_code = scholarships.code \nWHERE scholarships.student_id IN (SELECT id FROM provided_sheet);\n```\n- Purpose: Check database constraints and triggers related to scholarships and orders\n```sql\nSELECT * FROM information_schema.constraints \nWHERE table_name IN ('scholarships', 'orders');\n```\n- Purpose: Check scholarship codes and discount values\n```sql\nSELECT * FROM scholarship_codes \nWHERE id IN (SELECT scholarship_code_id FROM scholarships);\n```\nNote: Table and column names must be validated before execution.",
+        "confidence_score": 92,
+        "data_sources": [
+            "Jira Ticket",
+            "Excel Attachment",
+            "Parsed Document",
+            "Historical Investigation"
+        ]
     }
 ]
