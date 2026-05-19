@@ -374,6 +374,8 @@ ANALYSIS_SECTIONS = [
     ("DB Checks", ["DB Checks", "Important DB Checks"]),
     ("Risky Dependencies", ["Risky Dependencies"]),
     ("Suggested Investigation", ["Suggested Investigation"]),
+    ("Suggested Test Scenarios", ["Suggested Test Scenarios", "Test Scenarios"]),
+    ("Suggested SQL Queries", ["Suggested SQL Queries", "SQL Queries"]),
     ("Regression Focus", ["Regression Focus"]),
 ]
 
@@ -382,6 +384,8 @@ SECTION_ICONS = {
     "DB Checks": "🗄️",
     "Risky Dependencies": "⚠️",
     "Suggested Investigation": "🧭",
+    "Suggested Test Scenarios": "🧪",
+    "Suggested SQL Queries": "🧾",
     "Regression Focus": "✅",
 }
 
@@ -433,9 +437,33 @@ def render_inline_markdown(text):
 def render_section_body(content):
     html_lines = []
     in_list = False
+    in_code_block = False
+    code_lines = []
 
     for line in content.splitlines():
         stripped_line = line.strip()
+
+        if stripped_line.startswith("```"):
+            if in_code_block:
+                html_lines.append(
+                    "<pre><code>"
+                    + html.escape("\n".join(code_lines))
+                    + "</code></pre>"
+                )
+                code_lines = []
+                in_code_block = False
+            else:
+                if in_list:
+                    html_lines.append("</ul>")
+                    in_list = False
+
+                in_code_block = True
+
+            continue
+
+        if in_code_block:
+            code_lines.append(line)
+            continue
 
         if not stripped_line:
             if in_list:
@@ -458,6 +486,13 @@ def render_section_body(content):
 
     if in_list:
         html_lines.append("</ul>")
+
+    if in_code_block:
+        html_lines.append(
+            "<pre><code>"
+            + html.escape("\n".join(code_lines))
+            + "</code></pre>"
+        )
 
     return "\n".join(html_lines)
 
@@ -709,6 +744,22 @@ st.markdown(
         color: #e0f2fe;
         border-radius: 4px;
         padding: 0.08rem 0.28rem;
+    }
+
+    .qa-analysis-body pre {
+        background: rgba(2, 6, 23, 0.68);
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        border-radius: 8px;
+        margin: 0.6rem 0 0 0;
+        overflow-x: auto;
+        padding: 0.75rem;
+    }
+
+    .qa-analysis-body pre code {
+        background: transparent;
+        color: #e0f2fe;
+        padding: 0;
+        white-space: pre;
     }
 
     .grounding-grid {
@@ -1044,6 +1095,10 @@ if st.button("Analyze Impact"):
     - Focus on actionable QA insights
     - Infer likely DB tables/columns if applicable
     - Mention possible hidden dependencies
+    - Include 3 to 6 concrete QA test scenarios when possible
+    - Suggest 2 to 4 read-only SQL SELECT queries when DB checks are relevant
+    - Do NOT suggest UPDATE, DELETE, INSERT, DROP, ALTER, TRUNCATE, or migration SQL
+    - Add a note that table and column names must be validated before execution
     - Think like a senior QA investigator
 
     VALIDATION RULES:
@@ -1075,6 +1130,15 @@ if st.button("Analyze Impact"):
 
     ## Suggested Investigation
     - ...
+
+    ## Suggested Test Scenarios
+    - ...
+
+    ## Suggested SQL Queries
+    - Purpose: ...
+    ```sql
+    SELECT ...
+    ```
 
     ## Regression Focus
     - ...

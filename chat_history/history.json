@@ -52,5 +52,30 @@
             "Parsed Document",
             "Historical Investigation"
         ]
+    },
+    {
+        "timestamp": "2026-05-20T01:53:27",
+        "ticket": "STF-8104",
+        "topic": "General investigation",
+        "question": "What validations are needed?",
+        "response": "## Affected Areas\n- Scholarship management\n- Discount coupon system\n- User account management\n- Order management\n\n## Important DB Checks\n- `scholarships` table: checking for updates to `discount_amount` and `coupon_code`\n- `users` table: verifying `user_id` associations with scholarships and orders\n- `orders` table: checking for status updates (e.g., from \"pending\" to \"rejected\")\n\n## Risky Dependencies\n- Coupon code generation and validation logic\n- Scholarship discount amount calculation and application\n- Order status update logic\n\n## Suggested Investigation\n- Investigate how changes to discount amounts are reflected in the `scholarships` table\n- Analyze the logic for generating and validating coupon codes\n- Examine the dependencies between `users`, `scholarships`, and `orders` tables\n\n## Suggested Test Scenarios\n- Test applying a discount coupon to a user's order and verify the updated order status\n- Verify that changes to the `discount_amount` are correctly reflected in the `scholarships` table\n- Test the generation and validation of coupon codes, including edge cases (e.g., expired codes, codes with invalid characters)\n- Test the update of order status from \"pending\" to \"rejected\" and verify the associated user and scholarship data\n\n## Regression Focus\n- Regression testing of existing functionality, such as:\n  - Applying discount coupons to orders\n  - Updating order status\n  - Managing user scholarships and discounts\n  - Verifying data consistency across related tables (`users`, `scholarships`, `orders`)",
+        "confidence_score": 80,
+        "data_sources": [
+            "Excel Attachment",
+            "Parsed Document",
+            "Historical Investigation"
+        ]
+    },
+    {
+        "timestamp": "2026-05-20T01:57:55",
+        "ticket": "STF-7396",
+        "topic": "General investigation",
+        "question": "What hidden dependencies should I check?",
+        "response": "## Affected Areas\n- Scholarship gift management\n- Discount percentage application\n- Course type validation\n- Status updates\n\n## Important DB Checks\n- `scholarship_gifts` table data consistency\n- `scholarship_type_id` relationships\n- `discount_percentage` value validation\n\n## Risky Dependencies\n- Scholarship gift course type and discount percentage dependencies\n- Status update logic and its impact on gift management\n- Possible API integrations for course and gift management\n\n## Suggested Investigation\n- Investigate how changes to `scholarship_type_id` affect `discount_percentage` and course type\n- Analyze the impact of status updates on gift management and course assignments\n- Review API integrations for potential dependencies and regression areas\n\n## Suggested Test Scenarios\n- Test creating a new scholarship gift with different course types and discount percentages\n- Validate status updates and their effects on gift management and course assignments\n- Verify API integrations for course and gift management functionality\n- Check data consistency in the `scholarship_gifts` table after various operations\n\n## Suggested SQL Queries\n- Purpose: Validate `scholarship_gifts` table data consistency\n```sql\nSELECT * \nFROM joacademy_db.scholarship_gifts \nWHERE deleted_at IS NULL AND status = 1 AND discount_percentage = '50%';\n```\n- Purpose: Investigate `scholarship_type_id` relationships\n```sql\nSELECT DISTINCT scholarship_type_id, COUNT(*) \nFROM joacademy_db.scholarship_gifts \nGROUP BY scholarship_type_id;\n```\n- Purpose: Check for invalid `discount_percentage` values\n```sql\nSELECT * \nFROM joacademy_db.scholarship_gifts \nWHERE deleted_at IS NULL AND status = 1 AND discount_percentage NOT IN ('50%');\n```\nNote: Table and column names must be validated before executing these SQL queries.\n\n## Regression Focus\n- Regression testing for changes to `scholarship_type_id`, `discount_percentage`, and course type\n- Status update logic and its effects on gift management and course assignments\n- API integration testing for course and gift management functionality",
+        "confidence_score": 72,
+        "data_sources": [
+            "Excel Attachment",
+            "Parsed Document"
+        ]
     }
 ]
