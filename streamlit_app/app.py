@@ -557,7 +557,10 @@ except:
 
 # ---------------- MAIN UI ----------------
 
-st.image("banner.png", use_container_width=True)
+banner_left, banner_center, banner_right = st.columns([1, 2, 1])
+
+with banner_center:
+    st.image("banner.png", width=520)
 
 st.title("🔎 QA AI Impact Analysis Assistant")
 
@@ -631,7 +634,7 @@ st.markdown(
     }
 
     div[data-testid="stButton"] > button {
-        height: 3.65rem;
+        height: 3.2rem;
         width: 100%;
         white-space: normal;
         line-height: 1.2;
@@ -689,26 +692,27 @@ st.markdown(
     .attachment-summary span {
         color: #7dd3fc;
     }
+
+    .sidebar-context-card {
+        border: 1px solid rgba(125, 211, 252, 0.26);
+        border-radius: 8px;
+        background: rgba(14, 165, 233, 0.1);
+        color: #e0f2fe;
+        margin: 0.5rem 0 0.75rem 0;
+        padding: 0.75rem 0.85rem;
+    }
+
+    .sidebar-context-card strong {
+        color: #7dd3fc;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-with st.expander("💡 How QA should search"):
-    st.markdown(
-        """
-        1. Select the testing environment.
-        2. Enter the Jira ticket ID, for example `STF-7063`.
-        3. Ask one focused QA investigation question.
-        4. Use questions about regression, DB checks, APIs, validations, affected areas, or risky dependencies.
-
-        Example questions:
-        - What should I regression test in this ticket?
-        - Which DB tables or fields should I verify?
-        - What hidden dependencies could be affected?
-        - What API or business rules should I investigate?
-        """
-    )
+st.caption(
+    "Select a ticket, choose a suggested QA question or write your own, then run the impact analysis."
+)
 
 col1, col2 = st.columns(2)
 
@@ -733,21 +737,24 @@ attachment_summary = ""
 parsed_attachment_count = 0
 unsupported_attachment_count = 0
 
-st.markdown(
+st.sidebar.markdown("## Ticket Context")
+st.sidebar.markdown(
     f"""
-    <div class="attachment-summary">
-        Attachments found: <span>{attachment_count}</span>
+    <div class="sidebar-context-card">
+        <div><strong>Ticket:</strong> {html.escape(ticket)}</div>
+        <div><strong>Environment:</strong> {html.escape(environment)}</div>
+        <div><strong>Attachments:</strong> {attachment_count}</div>
     </div>
     """,
     unsafe_allow_html=True
 )
 
 if ticket_attachments:
-    with st.expander("📎 View attachment names"):
+    with st.sidebar.expander("📎 Attachment names"):
         for attachment in ticket_attachments:
             st.markdown(f"- `{attachment}`")
 
-    if st.button("Preview Attachment Data", use_container_width=True):
+    if st.sidebar.button("Preview Attachment Data", use_container_width=True):
         with st.spinner("Reading Excel/CSV attachments..."):
             (
                 attachment_summary,
@@ -756,14 +763,14 @@ if ticket_attachments:
             ) = build_attachment_content_summary(tuple(ticket_attachments))
 
         if attachment_summary:
-            st.markdown("#### 📊 Attachment Content Summary")
-            st.caption(
+            st.sidebar.markdown("#### 📊 Attachment Summary")
+            st.sidebar.caption(
                 f"Parsed tabular files: {parsed_attachment_count} | "
                 f"Unsupported files: {unsupported_attachment_count}"
             )
-            st.code(attachment_summary)
+            st.sidebar.code(attachment_summary[:3500])
         else:
-            st.info("No Excel or CSV attachment content found for this ticket.")
+            st.sidebar.info("No Excel or CSV attachment content found for this ticket.")
 
 if (
     "attachment_summary_by_ticket" not in st.session_state
@@ -778,11 +785,11 @@ else:
     attachment_summary = st.session_state.attachment_summary_by_ticket
 
 if attachment_summary and not st.session_state.get("hide_attachment_summary", False):
-    with st.expander("📊 Current attachment summary", expanded=False):
-        st.code(attachment_summary)
+    with st.sidebar.expander("📊 Current attachment summary", expanded=False):
+        st.code(attachment_summary[:3500])
 
 if not ticket_attachments:
-    st.info("No attachments found for this ticket.")
+    st.sidebar.info("No attachments found for this ticket.")
 
 suggested_questions = [
     "What should I regression test?",
