@@ -1,0 +1,33 @@
+BE - Scholarship Reset Migration
+
+
+
+Description
+
+Create a migration file for the students listed in the provided sheet to reset their scholarship state as follows:
+
+Cancel the existing order that is linked to the scholarship code.
+
+Update the student’s scholarship status back to Accepted.
+
+Update the scholarship code value to be exactly 50% discount.
+
+Ensure the student is able to apply again for the scholarship using the 50% discount, with no conflicts from previous orders or codes.
+
+This migration must apply only to the students included in the sheet.
+
+ 
+
+Acceptance Criteria:
+
+All students in the sheet are processed by the migration file.
+
+Any order linked to the scholarship code is successfully canceled.
+
+The scholarship status for each student is set to Accepted.
+
+The scholarship code discount value is updated to 50% exactly.
+
+Students can reapply for the scholarship from the beginning without errors.
+
+No impact on students who are not included in the sheet.

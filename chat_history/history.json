@@ -1,0 +1,14 @@
+[
+    {
+        "timestamp": "2026-05-20 00:24:52.612138",
+        "ticket": "STF-7063",
+        "question": "What should I regression test in this ticket?",
+        "response": "## Affected Areas\n- Student information management\n- Scholarship management\n- Order management\n- Discount management\n\n## Important DB Checks\n- Students table (e.g., student_id, scholarship_status)\n- Scholarships table (e.g., scholarship_code, discount_value)\n- Orders table (e.g., order_id, scholarship_code, status)\n- Student-scholarship relationships table (if exists)\n\n## Risky Dependencies\n- Order cancellation logic\n- Scholarship status update logic\n- Discount value update logic\n- Potential hidden dependencies: payment processing, student enrollment status\n\n## Suggested Investigation\n- Investigate the migration file's impact on data consistency and integrity\n- Analyze the order cancellation process to ensure it doesn't trigger unintended cascading effects\n- Verify that the scholarship status update and discount value update are correctly applied\n\n## Regression Focus\n- Test that students not included in the sheet are unaffected\n- Verify that students can reapply for the scholarship without errors\n- Test edge cases: students with multiple scholarships, students with canceled orders, etc.\n- Regression test APIs related to student information, scholarship management, and order management"
+    },
+    {
+        "timestamp": "2026-05-20 00:25:36.389556",
+        "ticket": "STF-7142",
+        "question": "What should I regression test in this ticket?",
+        "response": "## Affected Areas\n- Student information management\n- Scholarship management\n- Order management\n- Discount management\n\n## Important DB Checks\n- Students table (e.g., student_id, scholarship_status)\n- Scholarships table (e.g., scholarship_code, discount_value)\n- Orders table (e.g., order_id, scholarship_code)\n- Student-Scholarship relationship table (if exists)\n\n## Risky Dependencies\n- Cancellation of existing orders\n- Updating student scholarship status\n- Scholarship code discount value updates\n- Potential conflicts with previous orders or codes\n\n## Suggested Investigation\n- Investigate the migration file's impact on students not included in the sheet\n- Analyze the logic for canceling existing orders and updating scholarship status\n- Examine the discount value update process to ensure it sets the value to exactly 50%\n\n## Regression Focus\n- Verify that students can reapply for the scholarship without errors\n- Check for any unexpected changes to student information or order status\n- Test the migration file with different student and scholarship scenarios\n- Validate that the migration file only affects students listed in the provided sheet"
+    }
+]
