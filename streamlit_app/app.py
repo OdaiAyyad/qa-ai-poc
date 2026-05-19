@@ -377,6 +377,14 @@ ANALYSIS_SECTIONS = [
     ("Regression Focus", ["Regression Focus"]),
 ]
 
+SECTION_ICONS = {
+    "Affected Areas": "🎯",
+    "DB Checks": "🗄️",
+    "Risky Dependencies": "⚠️",
+    "Suggested Investigation": "🧭",
+    "Regression Focus": "✅",
+}
+
 
 def normalize_heading(heading):
     return heading.lower().replace("important ", "").strip()
@@ -472,7 +480,7 @@ def render_ai_analysis(response):
         st.markdown(
             f"""
             <section class="qa-analysis-card">
-                <h4>{html.escape(title)}</h4>
+                <h4>{SECTION_ICONS.get(title, "•")} {html.escape(title)}</h4>
                 <div class="qa-analysis-body">
                     {render_section_body(content)}
                 </div>
@@ -488,7 +496,7 @@ def render_ai_analysis(response):
 
 st.sidebar.title("QA AI Assistant")
 
-st.sidebar.markdown("## Investigation History")
+st.sidebar.markdown("## 📌 Investigation History")
 
 try:
     with open("chat_history/history.json", "r", encoding="utf-8") as file:
@@ -551,7 +559,7 @@ except:
 
 st.image("banner.png", use_container_width=True)
 
-st.title("QA AI Impact Analysis Assistant")
+st.title("🔎 QA AI Impact Analysis Assistant")
 
 st.markdown(
     "Analyze Jira tickets and identify affected areas, business logic, and regression risks."
@@ -686,7 +694,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-with st.expander("How QA should search"):
+with st.expander("💡 How QA should search"):
     st.markdown(
         """
         1. Select the testing environment.
@@ -735,7 +743,7 @@ st.markdown(
 )
 
 if ticket_attachments:
-    with st.expander("View attachment names"):
+    with st.expander("📎 View attachment names"):
         for attachment in ticket_attachments:
             st.markdown(f"- `{attachment}`")
 
@@ -748,7 +756,7 @@ if ticket_attachments:
             ) = build_attachment_content_summary(tuple(ticket_attachments))
 
         if attachment_summary:
-        st.markdown("#### Attachment Content Summary")
+            st.markdown("#### 📊 Attachment Content Summary")
             st.caption(
                 f"Parsed tabular files: {parsed_attachment_count} | "
                 f"Unsupported files: {unsupported_attachment_count}"
@@ -770,7 +778,7 @@ else:
     attachment_summary = st.session_state.attachment_summary_by_ticket
 
 if attachment_summary and not st.session_state.get("hide_attachment_summary", False):
-    with st.expander("Current attachment summary", expanded=False):
+    with st.expander("📊 Current attachment summary", expanded=False):
         st.code(attachment_summary)
 
 if not ticket_attachments:
@@ -788,7 +796,7 @@ suggested_questions = [
 if "question" not in st.session_state:
     st.session_state.question = ""
 
-st.markdown("### Suggested Questions")
+st.markdown("### 💬 Suggested Questions")
 
 for row_start in range(0, len(suggested_questions), 3):
     question_cols = st.columns(3)
@@ -934,7 +942,7 @@ if st.button("Analyze Impact"):
 
     st.success("Analysis Generated Successfully")
 
-    st.markdown("## AI Analysis")
+    st.markdown("## 🧠 AI Analysis")
 
     ai_response = response.choices[0].message.content
 
