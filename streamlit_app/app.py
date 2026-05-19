@@ -21,6 +21,9 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
+MAX_ATTACHMENT_PREVIEW_ROWS = 10
+MAX_ATTACHMENT_SUMMARY_CHARS = 12000
+
 
 def get_ticket_topic(ticket_content):
     for line in ticket_content.splitlines():
@@ -56,6 +59,121 @@ def get_ticket_attachments(ticket_id):
         ])
     except:
         return []
+
+
+def get_interesting_columns(columns):
+    keywords = [
+        "id",
+        "student",
+        "mobile",
+        "phone",
+        "status",
+        "discount",
+        "scholarship",
+        "order",
+        "code",
+    ]
+
+    return [
+        column
+        for column in columns
+        if any(keyword in str(column).lower() for keyword in keywords)
+    ]
+
+
+def summarize_dataframe(df, source_name):
+    summary = [
+        f"Source: {source_name}",
+        f"Rows: {len(df)}",
+        f"Columns: {', '.join(str(column) for column in df.columns)}",
+    ]
+
+    interesting_columns = get_interesting_columns(df.columns)
+
+    if interesting_columns:
+        summary.append(
+            "Likely QA-relevant columns: "
+            + ", ".join(str(column) for column in interesting_columns)
+        )
+
+        for column in interesting_columns[:6]:
+            values = (
+                df[column]
+                .dropna()
+                .astype(str)
+                .str.strip()
+            )
+            values = values[values != ""].unique()[:8]
+
+            if len(values):
+                summary.append(
+                    f"Sample values for {column}: {', '.join(values)}"
+                )
+
+    if not df.empty:
+        preview = df.head(MAX_ATTACHMENT_PREVIEW_ROWS).fillna("").astype(str)
+        summary.append("Preview rows:")
+        summary.append(preview.to_string(index=False))
+
+    return "\n".join(summary)
+
+
+@st.cache_data(show_spinner=False)
+def build_attachment_content_summary(attachments):
+    import pandas as pd
+
+    summary_blocks = []
+    parsed_files = 0
+    unsupported_files = []
+
+    for attachment in attachments:
+        file_path = os.path.join("attachments", attachment)
+        extension = os.path.splitext(attachment)[1].lower()
+
+        try:
+            if extension in [".xlsx", ".xls"]:
+                excel_file = pd.ExcelFile(file_path)
+                sheet_blocks = [f"File: {attachment}"]
+
+                for sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                    sheet_blocks.append(
+                        summarize_dataframe(df, f"Sheet: {sheet_name}")
+                    )
+
+                summary_blocks.append("\n\n".join(sheet_blocks))
+                parsed_files += 1
+            elif extension == ".csv":
+                df = pd.read_csv(file_path)
+                summary_blocks.append(
+                    "\n".join([
+                        f"File: {attachment}",
+                        summarize_dataframe(df, "CSV"),
+                    ])
+                )
+                parsed_files += 1
+            else:
+                unsupported_files.append(attachment)
+        except Exception as error:
+            summary_blocks.append(
+                f"File: {attachment}\nCould not parse attachment: {error}"
+            )
+
+    if unsupported_files:
+        summary_blocks.append(
+            "Unsupported attachments not parsed yet: "
+            + ", ".join(unsupported_files)
+        )
+
+    summary = "\n\n---\n\n".join(summary_blocks).strip()
+
+    if len(summary) > MAX_ATTACHMENT_SUMMARY_CHARS:
+        summary = (
+            summary[:MAX_ATTACHMENT_SUMMARY_CHARS]
+            + "\n\n[Attachment summary truncated for prompt size.]"
+        )
+
+    return summary, parsed_files, len(unsupported_files)
 
 
 def get_topic_for_ticket(ticket_id):
@@ -469,6 +587,9 @@ with col2:
 
 ticket_attachments = get_ticket_attachments(ticket)
 attachment_count = len(ticket_attachments)
+attachment_summary = ""
+parsed_attachment_count = 0
+unsupported_attachment_count = 0
 
 st.markdown(
     f"""
@@ -483,6 +604,43 @@ if ticket_attachments:
     with st.expander("View attachment names"):
         for attachment in ticket_attachments:
             st.markdown(f"- `{attachment}`")
+
+    if st.button("Preview Attachment Data", use_container_width=True):
+        with st.spinner("Reading Excel/CSV attachments..."):
+            (
+                attachment_summary,
+                parsed_attachment_count,
+                unsupported_attachment_count
+            ) = build_attachment_content_summary(tuple(ticket_attachments))
+
+        if attachment_summary:
+            st.markdown("#### Attachment Content Summary")
+            st.caption(
+                f"Parsed tabular files: {parsed_attachment_count} | "
+                f"Unsupported files: {unsupported_attachment_count}"
+            )
+            st.code(attachment_summary)
+        else:
+            st.info("No Excel or CSV attachment content found for this ticket.")
+
+if (
+    "attachment_summary_by_ticket" not in st.session_state
+    or st.session_state.get("attachment_summary_ticket") != ticket
+):
+    st.session_state.attachment_summary_by_ticket = ""
+    st.session_state.attachment_summary_ticket = ticket
+
+if attachment_summary:
+    st.session_state.attachment_summary_by_ticket = attachment_summary
+else:
+    attachment_summary = st.session_state.attachment_summary_by_ticket
+
+if attachment_summary and not st.session_state.get("hide_attachment_summary", False):
+    with st.expander("Current attachment summary", expanded=False):
+        st.code(attachment_summary)
+
+if not ticket_attachments:
+    st.info("No attachments found for this ticket.")
 
 suggested_questions = [
     "What should I regression test?",
@@ -538,6 +696,17 @@ if st.button("Analyze Impact"):
         ticket_content = "Ticket not found."
 
     ticket_topic = get_ticket_topic(ticket_content)
+    attachment_summary = st.session_state.get("attachment_summary_by_ticket", "")
+
+    if ticket_attachments and not attachment_summary:
+        with st.spinner("Reading Excel/CSV attachments..."):
+            (
+                attachment_summary,
+                parsed_attachment_count,
+                unsupported_attachment_count
+            ) = build_attachment_content_summary(tuple(ticket_attachments))
+
+        st.session_state.attachment_summary_by_ticket = attachment_summary
 
     # Empty question validation
     if not question.strip():
@@ -568,8 +737,11 @@ if st.button("Analyze Impact"):
     Attachments Found:
     {attachment_count}
 
-    Attachment Content:
-    Not parsed yet. Use this only as a signal that supporting files exist.
+    Parsed Tabular Attachments:
+    {parsed_attachment_count}
+
+    Attachment Content Summary:
+    {attachment_summary if attachment_summary else "No parsable Excel or CSV content found for this ticket."}
 
     User Question:
     {question}
