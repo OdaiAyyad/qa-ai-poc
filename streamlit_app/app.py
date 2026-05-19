@@ -3,6 +3,8 @@ from groq import Groq
 import os
 from dotenv import load_dotenv
 import json
+import html
+import re
 from datetime import datetime
 
 # ---------------- PAGE CONFIG ----------------
@@ -19,6 +21,217 @@ client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
+
+def get_ticket_topic(ticket_content):
+    for line in ticket_content.splitlines():
+        cleaned_line = line.strip()
+
+        if cleaned_line:
+            return cleaned_line
+
+    return "General investigation"
+
+
+def get_available_tickets():
+    try:
+        ticket_files = [
+            file_name[:-4]
+            for file_name in os.listdir("tickets")
+            if file_name.lower().endswith(".txt")
+        ]
+
+        return sorted(ticket_files)
+    except:
+        return []
+
+
+def get_ticket_attachments(ticket_id):
+    try:
+        ticket_key = ticket_id.lower()
+
+        return sorted([
+            file_name
+            for file_name in os.listdir("attachments")
+            if ticket_key in file_name.lower()
+        ])
+    except:
+        return []
+
+
+def get_topic_for_ticket(ticket_id):
+    try:
+        with open(f"tickets/{ticket_id}.txt", "r", encoding="utf-8") as file:
+            return get_ticket_topic(file.read())
+    except:
+        return "General investigation"
+
+
+def build_history_groups(history):
+    groups = {}
+    topic_cache = {}
+
+    for item in history:
+        ticket_id = item.get("ticket", "Unknown ticket")
+        topic = item.get("topic")
+
+        if not topic:
+            if ticket_id not in topic_cache:
+                topic_cache[ticket_id] = get_topic_for_ticket(ticket_id)
+
+            topic = topic_cache[ticket_id]
+
+        group_key = f"{ticket_id}::{topic}"
+
+        if group_key not in groups:
+            groups[group_key] = {
+                "ticket": ticket_id,
+                "topic": topic,
+                "items": []
+            }
+
+        groups[group_key]["items"].append(item)
+
+    return groups
+
+
+def parse_timestamp(timestamp):
+    if not timestamp:
+        return datetime.min
+
+    try:
+        return datetime.fromisoformat(timestamp)
+    except ValueError:
+        try:
+            return datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+        except ValueError:
+            return datetime.min
+
+
+def format_timestamp(timestamp):
+    if not timestamp:
+        return ""
+
+    try:
+        return parse_timestamp(timestamp).strftime("%d %b %Y, %I:%M %p")
+    except ValueError:
+        return timestamp
+
+
+ANALYSIS_SECTIONS = [
+    ("Affected Areas", ["Affected Areas"]),
+    ("DB Checks", ["DB Checks", "Important DB Checks"]),
+    ("Risky Dependencies", ["Risky Dependencies"]),
+    ("Suggested Investigation", ["Suggested Investigation"]),
+    ("Regression Focus", ["Regression Focus"]),
+]
+
+
+def normalize_heading(heading):
+    return heading.lower().replace("important ", "").strip()
+
+
+def parse_analysis_sections(response):
+    sections = {}
+    current_section = None
+    current_lines = []
+
+    for line in response.splitlines():
+        heading_match = re.match(r"^\s*#{1,3}\s+(.+?)\s*$", line)
+
+        if heading_match:
+            heading = heading_match.group(1).strip()
+            normalized_heading = normalize_heading(heading)
+            matched_title = None
+
+            for title, aliases in ANALYSIS_SECTIONS:
+                if normalized_heading in [normalize_heading(alias) for alias in aliases]:
+                    matched_title = title
+                    break
+
+            if matched_title:
+                if current_section:
+                    sections[current_section] = "\n".join(current_lines).strip()
+
+                current_section = matched_title
+                current_lines = []
+                continue
+
+        if current_section:
+            current_lines.append(line)
+
+    if current_section:
+        sections[current_section] = "\n".join(current_lines).strip()
+
+    return sections
+
+
+def render_inline_markdown(text):
+    escaped_text = html.escape(text.strip())
+    return re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped_text)
+
+
+def render_section_body(content):
+    html_lines = []
+    in_list = False
+
+    for line in content.splitlines():
+        stripped_line = line.strip()
+
+        if not stripped_line:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            continue
+
+        if stripped_line.startswith("- "):
+            if not in_list:
+                html_lines.append("<ul>")
+                in_list = True
+
+            html_lines.append(f"<li>{render_inline_markdown(stripped_line[2:])}</li>")
+        else:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+
+            html_lines.append(f"<p>{render_inline_markdown(stripped_line)}</p>")
+
+    if in_list:
+        html_lines.append("</ul>")
+
+    return "\n".join(html_lines)
+
+
+def render_ai_analysis(response):
+    sections = parse_analysis_sections(response)
+
+    if not sections:
+        st.markdown(response)
+        return
+
+    st.markdown('<div class="qa-analysis-grid">', unsafe_allow_html=True)
+
+    for title, _ in ANALYSIS_SECTIONS:
+        content = sections.get(title)
+
+        if not content:
+            continue
+
+        st.markdown(
+            f"""
+            <section class="qa-analysis-card">
+                <h4>{html.escape(title)}</h4>
+                <div class="qa-analysis-body">
+                    {render_section_body(content)}
+                </div>
+            </section>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 # ---------------- SIDEBAR ----------------
 
 st.sidebar.title("QA AI Assistant")
@@ -32,25 +245,49 @@ try:
         if not history:
             st.sidebar.write("No history yet.")
 
-        for item in reversed(history):
-            ticket_id = item.get("ticket", "Unknown ticket")
-            timestamp = item.get("timestamp", "")
-            question = item.get("question", "No question")
-            response = item.get("response", "No response saved.")
-            question_preview = question
+        history_groups = build_history_groups(history)
 
-            if len(question_preview) > 45:
-                question_preview = f"{question_preview[:45]}..."
+        sorted_groups = sorted(
+            history_groups.values(),
+            key=lambda group: max(
+                parse_timestamp(item.get("timestamp", ""))
+                for item in group["items"]
+            ),
+            reverse=True
+        )
 
-            with st.sidebar.expander(f"{ticket_id} - {question_preview}"):
-                if timestamp:
-                    st.caption(timestamp)
+        for group in sorted_groups:
+            ticket_id = group["ticket"]
+            topic = group["topic"]
+            searches = sorted(
+                group["items"],
+                key=lambda item: parse_timestamp(item.get("timestamp", "")),
+                reverse=True
+            )
+            search_count = len(searches)
+            group_title = f"{ticket_id} - {topic}"
 
-                st.markdown("**Question**")
-                st.write(question)
+            if len(group_title) > 48:
+                group_title = f"{group_title[:48]}..."
 
-                st.markdown("**AI Analysis**")
-                st.markdown(response)
+            with st.sidebar.expander(f"{group_title} ({search_count})"):
+                tab_labels = [f"Search {index + 1}" for index in range(search_count)]
+                tabs = st.tabs(tab_labels)
+
+                for tab, item in zip(tabs, searches):
+                    with tab:
+                        timestamp = format_timestamp(item.get("timestamp", ""))
+                        question = item.get("question", "No question")
+                        response = item.get("response", "No response saved.")
+
+                        if timestamp:
+                            st.caption(timestamp)
+
+                        st.markdown("**Question**")
+                        st.write(question)
+
+                        st.markdown("**AI Analysis**")
+                        render_ai_analysis(response)
 
 except:
     st.sidebar.write("No history yet.")
@@ -66,6 +303,135 @@ st.title("QA AI Impact Analysis Assistant")
 
 st.markdown(
     "Analyze Jira tickets and identify affected areas, business logic, and regression risks."
+)
+
+st.markdown(
+    """
+    <style>
+    html, body, [data-testid="stAppViewContainer"] {
+        background: #0f172a;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        color: #f8fafc;
+    }
+
+    h1, h2, h3 {
+        color: #e0f2fe;
+    }
+
+    [data-testid="stExpander"] {
+        border: 1px solid rgba(56, 189, 248, 0.26);
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.42);
+    }
+
+    .qa-analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 0.85rem;
+        margin-top: 0.5rem;
+    }
+
+    .qa-analysis-card {
+        border: 1px solid rgba(125, 211, 252, 0.34);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.96));
+        box-shadow: 0 14px 28px rgba(2, 132, 199, 0.12);
+        padding: 1rem;
+        min-height: 10rem;
+    }
+
+    .qa-analysis-card h4 {
+        color: #bae6fd;
+        font-size: 1.08rem;
+        margin: 0 0 0.65rem 0;
+    }
+
+    .qa-analysis-body {
+        color: #e2e8f0;
+        font-size: 1rem;
+        line-height: 1.55;
+    }
+
+    .qa-analysis-body ul {
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    .qa-analysis-body li {
+        margin-bottom: 0.45rem;
+    }
+
+    .qa-analysis-body code {
+        background: rgba(14, 165, 233, 0.16);
+        color: #e0f2fe;
+        border-radius: 4px;
+        padding: 0.08rem 0.28rem;
+    }
+
+    div[data-testid="stButton"] > button {
+        height: 3.65rem;
+        width: 100%;
+        white-space: normal;
+        line-height: 1.2;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid #7dd3fc;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
+        color: #0f172a;
+        font-weight: 700;
+        box-shadow: 0 8px 18px rgba(14, 165, 233, 0.16);
+    }
+
+    div[data-testid="stButton"] > button:hover {
+        border-color: #38bdf8;
+        background: linear-gradient(180deg, #f0f9ff 0%, #7dd3fc 100%);
+        color: #082f49;
+    }
+
+    section[data-testid="stSidebar"] {
+        min-width: 22rem;
+        border-right: 1px solid rgba(125, 211, 252, 0.2);
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stExpander"] {
+        background: rgba(30, 41, 59, 0.9);
+    }
+
+    section[data-testid="stSidebar"] .qa-analysis-grid {
+        grid-template-columns: 1fr;
+    }
+
+    section[data-testid="stSidebar"] .qa-analysis-card {
+        min-height: auto;
+        padding: 0.75rem;
+    }
+
+    section[data-testid="stSidebar"] .qa-analysis-card h4 {
+        font-size: 0.98rem;
+    }
+
+    section[data-testid="stSidebar"] .qa-analysis-body {
+        font-size: 0.92rem;
+    }
+
+    .attachment-summary {
+        border: 1px solid rgba(125, 211, 252, 0.32);
+        border-radius: 8px;
+        background: rgba(14, 165, 233, 0.12);
+        color: #e0f2fe;
+        font-weight: 700;
+        margin: 0.35rem 0 0.75rem 0;
+        padding: 0.75rem 0.9rem;
+    }
+
+    .attachment-summary span {
+        color: #7dd3fc;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 with st.expander("How QA should search"):
@@ -93,11 +459,68 @@ with col1:
     )
 
 with col2:
-    ticket = st.text_input("Ticket ID")
+    available_tickets = get_available_tickets()
+
+    if available_tickets:
+        ticket = st.selectbox("Ticket ID", available_tickets)
+    else:
+        ticket = st.text_input("Ticket ID")
+        st.warning("No ticket files found in the tickets folder.")
+
+ticket_attachments = get_ticket_attachments(ticket)
+attachment_count = len(ticket_attachments)
+
+st.markdown(
+    f"""
+    <div class="attachment-summary">
+        Attachments found: <span>{attachment_count}</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+if ticket_attachments:
+    with st.expander("View attachment names"):
+        for attachment in ticket_attachments:
+            st.markdown(f"- `{attachment}`")
+
+suggested_questions = [
+    "What should I regression test?",
+    "What DB columns may be affected?",
+    "What hidden dependencies should I check?",
+    "What are the risky areas?",
+    "What validations are needed?",
+    "What APIs should I verify?",
+]
+
+if "question" not in st.session_state:
+    st.session_state.question = ""
+
+st.markdown("### Suggested Questions")
+
+for row_start in range(0, len(suggested_questions), 3):
+    question_cols = st.columns(3)
+    row_questions = suggested_questions[row_start:row_start + 3]
+
+    for index, suggested_question in enumerate(row_questions):
+        question_index = row_start + index
+
+        with question_cols[index]:
+            if st.button(
+                suggested_question,
+                key=f"suggested_question_{question_index}",
+                use_container_width=True
+            ):
+                st.session_state.question = suggested_question
+
+    for empty_index in range(len(row_questions), 3):
+        with question_cols[empty_index]:
+            st.empty()
 
 question = st.text_area(
     "Ask your QA question",
-    placeholder="Example: What should I regression test in STF-7063?"
+    placeholder="Example: What should I regression test in STF-7063?",
+    key="question"
 )
 
 # ---------------- BUTTON ----------------
@@ -113,6 +536,8 @@ if st.button("Analyze Impact"):
             ticket_content = file.read()
     except:
         ticket_content = "Ticket not found."
+
+    ticket_topic = get_ticket_topic(ticket_content)
 
     # Empty question validation
     if not question.strip():
@@ -139,6 +564,12 @@ if st.button("Analyze Impact"):
 
     Ticket Content:
     {ticket_content}
+
+    Attachments Found:
+    {attachment_count}
+
+    Attachment Content:
+    Not parsed yet. Use this only as a signal that supporting files exist.
 
     User Question:
     {question}
@@ -202,23 +633,24 @@ if st.button("Analyze Impact"):
     ai_response = response.choices[0].message.content
 
     chat_entry = {
-    "timestamp": str(datetime.now()),
-    "ticket": ticket,
-    "question": question,
-    "response": ai_response
-}
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "ticket": ticket,
+        "topic": ticket_topic,
+        "question": question,
+        "response": ai_response
+    }
 
     history_file = "chat_history/history.json"
 
     try:
-        with open(history_file, "r") as file:
+        with open(history_file, "r", encoding="utf-8") as file:
             history = json.load(file)
     except:
         history = []
 
     history.append(chat_entry)
 
-    with open(history_file, "w") as file:
+    with open(history_file, "w", encoding="utf-8") as file:
         json.dump(history, file, indent=4)
 
-    st.markdown(ai_response)
+    render_ai_analysis(ai_response)

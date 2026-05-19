@@ -10,5 +10,26 @@
         "ticket": "STF-7142",
         "question": "What should I regression test in this ticket?",
         "response": "## Affected Areas\n- Student information management\n- Scholarship management\n- Order management\n- Discount management\n\n## Important DB Checks\n- Students table (e.g., student_id, scholarship_status)\n- Scholarships table (e.g., scholarship_code, discount_value)\n- Orders table (e.g., order_id, scholarship_code)\n- Student-Scholarship relationship table (if exists)\n\n## Risky Dependencies\n- Cancellation of existing orders\n- Updating student scholarship status\n- Scholarship code discount value updates\n- Potential conflicts with previous orders or codes\n\n## Suggested Investigation\n- Investigate the migration file's impact on students not included in the sheet\n- Analyze the logic for canceling existing orders and updating scholarship status\n- Examine the discount value update process to ensure it sets the value to exactly 50%\n\n## Regression Focus\n- Verify that students can reapply for the scholarship without errors\n- Check for any unexpected changes to student information or order status\n- Test the migration file with different student and scholarship scenarios\n- Validate that the migration file only affects students listed in the provided sheet"
+    },
+    {
+        "timestamp": "2026-05-20T01:12:40",
+        "ticket": "STF-7142",
+        "topic": "BE - Scholarship Reset Migration / Part 2",
+        "question": "What APIs should I verify?",
+        "response": "## Affected Areas\n- Student management API\n- Scholarship management API\n- Order management API\n\n## Important DB Checks\n- Students table (likely columns: student_id, scholarship_status)\n- Scholarships table (likely columns: scholarship_code, discount_value)\n- Orders table (likely columns: order_id, student_id, scholarship_code)\n- Student_Scholarship table (likely columns: student_id, scholarship_code, status)\n\n## Risky Dependencies\n- Order cancellation logic\n- Scholarship status update logic\n- Discount value update logic\n- Potential hidden dependencies: student eligibility checks, scholarship code validation\n\n## Suggested Investigation\n- Verify APIs: \n  * CancelOrder API\n  * UpdateStudentScholarshipStatus API\n  * UpdateScholarshipCodeDiscount API\n  * ApplyScholarship API\n- Investigate potential issues with concurrent scholarship applications\n- Test edge cases: students with multiple scholarships, students with canceled orders\n\n## Regression Focus\n- Existing student scholarship applications\n- Order management functionality\n- Scholarship code generation and validation\n- Student eligibility checks for scholarships"
+    },
+    {
+        "timestamp": "2026-05-20T01:13:06",
+        "ticket": "STF-7142",
+        "topic": "BE - Scholarship Reset Migration / Part 2",
+        "question": "What DB columns may be affected?",
+        "response": "## Affected Areas\n- Student information tables\n- Scholarship tables\n- Order management tables\n- Discount tables\n\n## Important DB Checks\n- `student_scholarship` table: `status`, `code`, `discount_value` columns\n- `orders` table: `order_status`, `scholarship_code` columns\n- `scholarship_codes` table: `code`, `discount_value` columns\n- `student_orders` table: `student_id`, `order_id`, `scholarship_code` columns\n\n## Risky Dependencies\n- Order cancellation logic\n- Scholarship code generation and update logic\n- Student eligibility for reapplying for scholarships\n- Discount value update logic\n\n## Suggested Investigation\n- Verify the data type and format of the `discount_value` column to ensure it can be updated to exactly 50%\n- Investigate how the migration file will handle cases where a student has multiple orders linked to the same scholarship code\n- Check for any triggers or cascading updates that may affect the `orders` or `scholarship_codes` tables\n\n## Regression Focus\n- Test that students not included in the sheet are not affected by the migration\n- Verify that the migration file correctly cancels existing orders and updates the scholarship status and code value for students in the sheet\n- Test that students can reapply for the scholarship without errors after the migration"
+    },
+    {
+        "timestamp": "2026-05-20T01:18:38",
+        "ticket": "STF-8104",
+        "topic": "General investigation",
+        "question": "What validations are needed?",
+        "response": "## Affected Areas\n- User input handling\n- Data validation modules\n- Error handling mechanisms\n\n## Important DB Checks\n- User table for input data consistency\n- Validation rules table for updated constraints\n- Error logs table for regression testing\n\n## Risky Dependencies\n- External API integrations for data validation\n- Complex business logic for custom validation rules\n- Hidden dependencies on third-party libraries for input sanitization\n\n## Suggested Investigation\n- Test cases for different input scenarios\n- Validation rule updates and their impact on existing data\n- Error handling for edge cases and boundary values\n\n## Regression Focus\n- Existing user input validation tests\n- API integration tests for data consistency\n- Error handling and logging mechanisms for unexpected inputs"
     }
 ]
