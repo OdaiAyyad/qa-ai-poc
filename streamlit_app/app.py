@@ -507,10 +507,10 @@ def save_validation_run(run_entry):
 
 def render_validation_history_sidebar():
     runs = read_json_file(VALIDATION_HISTORY_FILE, [])
-    st.sidebar.markdown("## SQL Validation Runs")
+    st.sidebar.markdown("## SQL Query History")
 
     if not runs:
-        st.sidebar.caption("No validation runs yet.")
+        st.sidebar.caption("No SQL validation runs yet.")
         return
 
     sorted_runs = sorted(
@@ -945,83 +945,14 @@ def render_grounding_panel(confidence_score, data_sources):
 # ---------------- SIDEBAR ----------------
 
 st.sidebar.image("banner.png", use_container_width=True)
-st.sidebar.title("QA AI Assistant")
-
-history = []
-
-try:
-    with open("chat_history/history.json", "r", encoding="utf-8") as file:
-        history = json.load(file)
-except:
-    history = []
-
-
-def render_history_sidebar(history_items):
-    st.sidebar.markdown("## 📌 Investigation History")
-
-    if not history_items:
-        st.sidebar.write("No history yet.")
-        st.sidebar.markdown("- Scholarship")
-        st.sidebar.markdown("- Orders")
-        st.sidebar.markdown("- Discounts")
-        return
-
-    history_groups = build_history_groups(history_items)
-
-    sorted_groups = sorted(
-        history_groups.values(),
-        key=lambda group: max(
-            parse_timestamp(item.get("timestamp", ""))
-            for item in group["items"]
-        ),
-        reverse=True
-    )
-
-    for group in sorted_groups:
-        ticket_id = group["ticket"]
-        topic = group["topic"]
-        searches = sorted(
-            group["items"],
-            key=lambda item: parse_timestamp(item.get("timestamp", "")),
-            reverse=True
-        )
-        search_count = len(searches)
-        group_title = f"{ticket_id} - {topic}"
-
-        if len(group_title) > 42:
-            group_title = f"{group_title[:42]}..."
-
-        with st.sidebar.expander(f"{group_title} ({search_count})"):
-            tab_labels = [f"Search {index + 1}" for index in range(search_count)]
-            tabs = st.tabs(tab_labels)
-
-            for tab, item in zip(tabs, searches):
-                with tab:
-                    timestamp = format_timestamp(item.get("timestamp", ""))
-                    question = item.get("question", "No question")
-                    response = item.get("response", "No response saved.")
-
-                    if timestamp:
-                        st.caption(timestamp)
-
-                    st.markdown("**Question**")
-                    st.write(question)
-
-                    if item.get("confidence_score") and item.get("data_sources"):
-                        render_grounding_panel(
-                            item["confidence_score"],
-                            item["data_sources"]
-                        )
-
-                    st.markdown("**AI Analysis**")
-                    render_ai_analysis(response)
+st.sidebar.title("QA SQL Validation Assistant")
 
 # ---------------- MAIN UI ----------------
 
-st.title("🔎 QA AI Impact Analysis Assistant")
+st.title("🔎 QA SQL Validation Assistant")
 
 st.markdown(
-    "Analyze Jira tickets and identify affected areas, business logic, and regression risks."
+    "Understand ticket data, define critical constraints, and generate SQL-style validation evidence."
 )
 
 st.markdown(
@@ -1269,7 +1200,7 @@ st.markdown(
 )
 
 st.caption(
-    "Select a ticket, load parsed attachment fields, define constraints, then run SQL-style validation checks."
+    "POC flow: 1) parse ticket attachments and discover fields, 2) validate constraints and save generated SQL checks."
 )
 
 col1, col2 = st.columns(2)
@@ -1295,7 +1226,6 @@ attachment_summary = ""
 parsed_attachment_count = 0
 unsupported_attachment_count = 0
 
-render_history_sidebar(history)
 render_validation_history_sidebar()
 
 st.sidebar.markdown("## Ticket Context")
@@ -1361,7 +1291,12 @@ if (
     st.session_state.validation_constraints = []
     st.session_state.last_validation_run = None
 
-st.markdown("### SQL Constraint Builder")
+st.markdown("### Step 1 - Business Data Understanding")
+st.caption(
+    "Load ticket attachments to discover sheets, columns, key identifiers, and likely validation fields."
+)
+
+st.markdown("### Step 2 - SQL-Style Constraint Validation")
 st.caption(
     "Load attachment fields, define critical constraints, validate them against the parsed files, and generate read-only SQL checks."
 )
@@ -1564,7 +1499,9 @@ if st.session_state.get("last_validation_run"):
         for query in run["sql_queries"]:
             st.code(query, language="sql")
 
-with st.expander("Optional AI impact analysis"):
+with st.expander("Optional natural-language helper"):
+    st.caption("This helper does not create project history. Official saved history is based on SQL validation runs.")
+
     if "question" not in st.session_state:
         st.session_state.question = ""
 
@@ -1607,9 +1544,10 @@ if analyze_clicked:
 
         st.session_state.attachment_summary_by_ticket = attachment_summary
 
+    prior_validation_runs = read_json_file(VALIDATION_HISTORY_FILE, [])
     has_historical_context = any(
         item.get("ticket") == ticket
-        for item in history
+        for item in prior_validation_runs
     )
     confidence_score = calculate_confidence_score(
         ticket_content,
@@ -1732,29 +1670,6 @@ if analyze_clicked:
     st.markdown("## 🧠 AI Analysis")
 
     ai_response = response.choices[0].message.content
-
-    chat_entry = {
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "ticket": ticket,
-        "topic": ticket_topic,
-        "question": question,
-        "response": ai_response,
-        "confidence_score": confidence_score,
-        "data_sources": data_sources
-    }
-
-    history_file = "chat_history/history.json"
-
-    try:
-        with open(history_file, "r", encoding="utf-8") as file:
-            history = json.load(file)
-    except:
-        history = []
-
-    history.append(chat_entry)
-
-    with open(history_file, "w", encoding="utf-8") as file:
-        json.dump(history, file, indent=4)
 
     render_grounding_panel(confidence_score, data_sources)
     render_ai_analysis(ai_response)

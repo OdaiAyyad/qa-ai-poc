@@ -169,6 +169,29 @@ The stronger product framing is:
 
 The current POC should continue moving toward that vision.
 
+## Current POC Scope After Latest Clarification
+
+Because there is currently no database/source-of-truth connection, the POC should **not** attempt real DB validation yet.
+
+For now, the POC should focus on two practical steps:
+
+1. **Business Logic And Data Understanding**
+   - Read Jira ticket text.
+   - Parse attached Excel/CSV files.
+   - Display parsed sheets, columns, row counts, and likely critical fields.
+   - Help QA identify constraints and edge cases from ticket logic and attached data.
+   - Check the attachment data itself for basic issues such as missing values, unexpected values, and invalid constraints.
+
+2. **SQL-Style Constraint Validation Without DB Execution**
+   - Let QA choose parsed file/sheet, column, operator, and expected value.
+   - Validate the constraint against the parsed attachment data.
+   - Generate read-only SQL that represents the future DB check.
+   - Save validation run history by ticket/environment/query/constraint.
+
+The old AI question/search history is no longer the main history model. The project history should now be based on **SQL validation runs and generated queries**, not natural-language AI searches.
+
+The optional natural-language helper can remain for support, but it should not be treated as the core workflow or main saved history.
+
 ## Desired Future Workflow
 
 ### 1. Ticket And File Parsing
