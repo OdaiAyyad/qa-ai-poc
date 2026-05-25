@@ -1,0 +1,179 @@
+[
+    {
+        "timestamp": "2026-05-23T15:54:04",
+        "ticket": "STF-7063",
+        "environment": "Preprod",
+        "status": "Passed",
+        "constraints": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "id",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "id",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 500,
+                "passed_rows": 500,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (id IS NULL OR id = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (id IS NULL OR id = '');"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 0
+    },
+    {
+        "timestamp": "2026-05-23T15:54:43",
+        "ticket": "STF-7063",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "status",
+                "operator": "equals",
+                "expected_value": "Accepted"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "status",
+                "operator": "equals",
+                "expected_value": "Accepted",
+                "status": "Failed",
+                "checked_rows": 500,
+                "passed_rows": 0,
+                "failed_rows": 500,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "True"
+                    },
+                    {
+                        "row": 3,
+                        "value": "True"
+                    },
+                    {
+                        "row": 4,
+                        "value": "True"
+                    },
+                    {
+                        "row": 5,
+                        "value": "True"
+                    },
+                    {
+                        "row": 6,
+                        "value": "True"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (status <> 'Accepted' OR status IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (status <> 'Accepted' OR status IS NULL);"
+        ],
+        "passed_constraints": 0,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-05-23T16:11:19",
+        "ticket": "STF-7142",
+        "environment": "Preprod",
+        "status": "Passed",
+        "constraints": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 9,
+                "passed_rows": 9,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (scholarship_id IS NULL OR scholarship_id = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (scholarship_id IS NULL OR scholarship_id = '');"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 0
+    },
+    {
+        "timestamp": "2026-05-23T16:11:48",
+        "ticket": "STF-7063",
+        "environment": "Preprod",
+        "status": "Passed",
+        "constraints": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "mobile1",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "mobile1",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 500,
+                "passed_rows": 500,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (mobile1 IS NULL OR mobile1 = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (mobile1 IS NULL OR mobile1 = '');"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 0
+    }
+]

@@ -25,6 +25,19 @@ client = Groq(
 
 MAX_ATTACHMENT_PREVIEW_ROWS = 10
 MAX_ATTACHMENT_SUMMARY_CHARS = 12000
+MAX_VALIDATION_ROWS = 500
+VALIDATION_HISTORY_FILE = "chat_history/validation_runs.json"
+
+CONSTRAINT_OPERATORS = [
+    "equals",
+    "not equals",
+    "contains",
+    "is not null",
+    "is null",
+    "greater than",
+    "less than",
+    "in list",
+]
 
 
 def ensure_workspace_packages():
@@ -216,6 +229,313 @@ def read_excel_fallback(file_path):
 
     workbook.close()
     return "\n\n".join(sheet_blocks)
+
+
+def sanitize_sql_identifier(value):
+    cleaned_value = re.sub(r"[^a-zA-Z0-9_]+", "_", str(value).strip().lower())
+    cleaned_value = cleaned_value.strip("_")
+
+    return cleaned_value or "parsed_attachment"
+
+
+def get_sql_value(value):
+    stripped_value = str(value).strip()
+
+    if stripped_value == "":
+        return "''"
+
+    try:
+        float(stripped_value)
+        return stripped_value
+    except ValueError:
+        return "'" + stripped_value.replace("'", "''") + "'"
+
+
+def normalize_cell_value(value):
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
+def parse_number(value):
+    try:
+        return float(str(value).strip())
+    except ValueError:
+        return None
+
+
+def read_csv_table(file_path, attachment):
+    with open(file_path, "r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.reader(file)
+        headers = [str(header) for header in next(reader, [])]
+        rows = []
+        total_rows = 0
+
+        for row in reader:
+            total_rows += 1
+
+            if len(rows) < MAX_VALIDATION_ROWS:
+                rows.append(row)
+
+    return [{
+        "id": f"{attachment}::CSV",
+        "label": f"{attachment} / CSV",
+        "file": attachment,
+        "sheet": "CSV",
+        "columns": headers,
+        "rows": rows,
+        "total_rows": total_rows,
+    }]
+
+
+def read_excel_tables(file_path, attachment):
+    ensure_workspace_packages()
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(file_path, read_only=True, data_only=True)
+    tables = []
+
+    for sheet in workbook.worksheets:
+        rows_iterator = sheet.iter_rows(values_only=True)
+        headers = [str(header) if header is not None else "" for header in next(rows_iterator, [])]
+        rows = []
+        total_rows = 0
+
+        for row in rows_iterator:
+            total_rows += 1
+
+            if len(rows) < MAX_VALIDATION_ROWS:
+                rows.append(["" if value is None else str(value) for value in row])
+
+        tables.append({
+            "id": f"{attachment}::{sheet.title}",
+            "label": f"{attachment} / {sheet.title}",
+            "file": attachment,
+            "sheet": sheet.title,
+            "columns": headers,
+            "rows": rows,
+            "total_rows": total_rows,
+        })
+
+    workbook.close()
+    return tables
+
+
+@st.cache_data(show_spinner=False)
+def parse_attachment_tables(attachments):
+    tables = []
+    unsupported_files = []
+    parse_errors = []
+
+    for attachment in attachments:
+        file_path = os.path.join("attachments", attachment)
+        extension = os.path.splitext(attachment)[1].lower()
+
+        try:
+            if extension == ".csv":
+                tables.extend(read_csv_table(file_path, attachment))
+            elif extension == ".xlsx":
+                tables.extend(read_excel_tables(file_path, attachment))
+            else:
+                unsupported_files.append(attachment)
+        except Exception as error:
+            parse_errors.append(f"{attachment}: {error}")
+
+    return tables, unsupported_files, parse_errors
+
+
+def get_table_by_id(tables, table_id):
+    for table in tables:
+        if table["id"] == table_id:
+            return table
+
+    return None
+
+
+def evaluate_constraint(row_value, operator, expected_value):
+    actual = normalize_cell_value(row_value)
+    expected = normalize_cell_value(expected_value)
+
+    if operator == "equals":
+        return actual.lower() == expected.lower()
+    if operator == "not equals":
+        return actual.lower() != expected.lower()
+    if operator == "contains":
+        return expected.lower() in actual.lower()
+    if operator == "is not null":
+        return actual != ""
+    if operator == "is null":
+        return actual == ""
+    if operator == "greater than":
+        actual_number = parse_number(actual)
+        expected_number = parse_number(expected)
+        return actual_number is not None and expected_number is not None and actual_number > expected_number
+    if operator == "less than":
+        actual_number = parse_number(actual)
+        expected_number = parse_number(expected)
+        return actual_number is not None and expected_number is not None and actual_number < expected_number
+    if operator == "in list":
+        expected_values = [
+            item.strip().lower()
+            for item in expected.split(",")
+            if item.strip()
+        ]
+        return actual.lower() in expected_values
+
+    return False
+
+
+def validate_constraint(table, column, operator, expected_value):
+    if not table or column not in table["columns"]:
+        return {
+            "status": "Failed",
+            "checked_rows": 0,
+            "passed_rows": 0,
+            "failed_rows": 0,
+            "sample_failures": [],
+        }
+
+    column_index = table["columns"].index(column)
+    checked_rows = 0
+    passed_rows = 0
+    sample_failures = []
+
+    for row_number, row in enumerate(table["rows"], start=2):
+        checked_rows += 1
+        row_value = row[column_index] if column_index < len(row) else ""
+        passed = evaluate_constraint(row_value, operator, expected_value)
+
+        if passed:
+            passed_rows += 1
+        elif len(sample_failures) < 5:
+            sample_failures.append({
+                "row": row_number,
+                "value": normalize_cell_value(row_value),
+            })
+
+    failed_rows = checked_rows - passed_rows
+
+    return {
+        "status": "Passed" if failed_rows == 0 and checked_rows > 0 else "Failed",
+        "checked_rows": checked_rows,
+        "passed_rows": passed_rows,
+        "failed_rows": failed_rows,
+        "sample_failures": sample_failures,
+    }
+
+
+def generate_constraint_sql(table, column, operator, expected_value):
+    table_name = sanitize_sql_identifier(f"{table['file']}_{table['sheet']}")
+    column_name = sanitize_sql_identifier(column)
+    expected_sql = get_sql_value(expected_value)
+
+    if operator == "equals":
+        where_clause = f"({column_name} <> {expected_sql} OR {column_name} IS NULL)"
+    elif operator == "not equals":
+        where_clause = f"{column_name} = {expected_sql}"
+    elif operator == "contains":
+        escaped_value = str(expected_value).replace("'", "''")
+        where_clause = f"({column_name} NOT LIKE '%{escaped_value}%' OR {column_name} IS NULL)"
+    elif operator == "is not null":
+        where_clause = f"({column_name} IS NULL OR {column_name} = '')"
+    elif operator == "is null":
+        where_clause = f"{column_name} IS NOT NULL"
+    elif operator == "greater than":
+        where_clause = f"({column_name} <= {expected_sql} OR {column_name} IS NULL)"
+    elif operator == "less than":
+        where_clause = f"({column_name} >= {expected_sql} OR {column_name} IS NULL)"
+    elif operator == "in list":
+        values = [
+            get_sql_value(item.strip())
+            for item in str(expected_value).split(",")
+            if item.strip()
+        ]
+        where_clause = f"{column_name} NOT IN ({', '.join(values)})"
+    else:
+        where_clause = "1 = 1"
+
+    return "\n".join([
+        "-- Suggested read-only validation query",
+        "-- Replace table/column names with the real DB schema before execution.",
+        f"SELECT *",
+        f"FROM {table_name}",
+        f"WHERE {where_clause};",
+    ])
+
+
+def suggest_constraints_for_table(table):
+    suggestions = []
+
+    for column in table.get("columns", []):
+        column_lower = str(column).lower()
+
+        if "discount" in column_lower:
+            suggestions.append((column, "equals", "50"))
+        elif "status" in column_lower:
+            suggestions.append((column, "equals", "Accepted"))
+        elif "mobile" in column_lower or column_lower.endswith("id") or "_id" in column_lower:
+            suggestions.append((column, "is not null", ""))
+
+        if len(suggestions) >= 5:
+            break
+
+    return suggestions
+
+
+def read_json_file(path, fallback):
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except:
+        return fallback
+
+
+def write_json_file(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
+
+
+def save_validation_run(run_entry):
+    runs = read_json_file(VALIDATION_HISTORY_FILE, [])
+    runs.append(run_entry)
+    write_json_file(VALIDATION_HISTORY_FILE, runs)
+
+
+def render_validation_history_sidebar():
+    runs = read_json_file(VALIDATION_HISTORY_FILE, [])
+    st.sidebar.markdown("## SQL Validation Runs")
+
+    if not runs:
+        st.sidebar.caption("No validation runs yet.")
+        return
+
+    sorted_runs = sorted(
+        runs,
+        key=lambda run: parse_timestamp(run.get("timestamp", "")),
+        reverse=True
+    )
+
+    for run in sorted_runs[:12]:
+        run_title = (
+            f"{run.get('ticket', 'Ticket')} - "
+            f"{run.get('environment', 'Env')} - "
+            f"{run.get('status', 'Status')}"
+        )
+
+        with st.sidebar.expander(run_title):
+            st.caption(format_timestamp(run.get("timestamp", "")))
+            st.write(f"Constraints: {len(run.get('constraints', []))}")
+            st.write(f"Passed: {run.get('passed_constraints', 0)}")
+            st.write(f"Failed: {run.get('failed_constraints', 0)}")
+
+            if run.get("sql_queries"):
+                with st.expander("SQL"):
+                    for query in run["sql_queries"]:
+                        st.code(query, language="sql")
 
 
 @st.cache_data(show_spinner=False)
@@ -949,7 +1269,7 @@ st.markdown(
 )
 
 st.caption(
-    "Select a ticket, choose a suggested QA question or write your own, then run the impact analysis."
+    "Select a ticket, load parsed attachment fields, define constraints, then run SQL-style validation checks."
 )
 
 col1, col2 = st.columns(2)
@@ -976,6 +1296,7 @@ parsed_attachment_count = 0
 unsupported_attachment_count = 0
 
 render_history_sidebar(history)
+render_validation_history_sidebar()
 
 st.sidebar.markdown("## Ticket Context")
 st.sidebar.markdown(
@@ -1031,48 +1352,237 @@ if attachment_summary and not st.session_state.get("hide_attachment_summary", Fa
 if not ticket_attachments:
     st.sidebar.info("No attachments found for this ticket.")
 
-suggested_questions = [
-    "What should I regression test?",
-    "What DB columns may be affected?",
-    "What hidden dependencies should I check?",
-    "What are the risky areas?",
-    "What validations are needed?",
-    "What APIs should I verify?",
-]
+if (
+    "constraint_ticket" not in st.session_state
+    or st.session_state.constraint_ticket != ticket
+):
+    st.session_state.constraint_ticket = ticket
+    st.session_state.parsed_tables = []
+    st.session_state.validation_constraints = []
+    st.session_state.last_validation_run = None
 
-if "question" not in st.session_state:
-    st.session_state.question = ""
-
-st.markdown("### 💬 Suggested Questions")
-
-for row_start in range(0, len(suggested_questions), 3):
-    question_cols = st.columns(3)
-    row_questions = suggested_questions[row_start:row_start + 3]
-
-    for index, suggested_question in enumerate(row_questions):
-        question_index = row_start + index
-
-        with question_cols[index]:
-            if st.button(
-                suggested_question,
-                key=f"suggested_question_{question_index}",
-                use_container_width=True
-            ):
-                st.session_state.question = suggested_question
-
-    for empty_index in range(len(row_questions), 3):
-        with question_cols[empty_index]:
-            st.empty()
-
-question = st.text_area(
-    "Ask your QA question",
-    placeholder="Example: What should I regression test in STF-7063?",
-    key="question"
+st.markdown("### SQL Constraint Builder")
+st.caption(
+    "Load attachment fields, define critical constraints, validate them against the parsed files, and generate read-only SQL checks."
 )
+
+if ticket_attachments:
+    if st.button("Load Attachment Fields", use_container_width=True):
+        with st.spinner("Reading attachment tables..."):
+            parsed_tables, unsupported_files, parse_errors = parse_attachment_tables(
+                tuple(ticket_attachments)
+            )
+
+        st.session_state.parsed_tables = parsed_tables
+        st.session_state.parsed_unsupported_files = unsupported_files
+        st.session_state.parsed_errors = parse_errors
+
+    if not st.session_state.parsed_tables:
+        st.info("Load attachment fields to start building SQL validation constraints.")
+else:
+    st.warning("No attachments are available for this ticket, so file-based validation cannot run yet.")
+
+parsed_tables = st.session_state.get("parsed_tables", [])
+
+if parsed_tables:
+    table_options = {
+        table["label"]: table["id"]
+        for table in parsed_tables
+    }
+
+    builder_col1, builder_col2 = st.columns([1.2, 0.8])
+
+    with builder_col1:
+        selected_table_label = st.selectbox(
+            "Parsed file / sheet",
+            list(table_options.keys())
+        )
+        selected_table = get_table_by_id(
+            parsed_tables,
+            table_options[selected_table_label]
+        )
+        selected_column = st.selectbox(
+            "Column",
+            selected_table["columns"]
+        )
+
+    with builder_col2:
+        selected_operator = st.selectbox("Constraint", CONSTRAINT_OPERATORS)
+        expected_value = st.text_input(
+            "Expected value",
+            disabled=selected_operator in ["is null", "is not null"],
+            placeholder="Example: 50, Accepted, 100"
+        )
+
+    st.caption(
+        f"Rows available in selected sheet: {selected_table['total_rows']} "
+        f"(preview validation uses up to {len(selected_table['rows'])} rows)"
+    )
+
+    suggestions = suggest_constraints_for_table(selected_table)
+
+    if suggestions:
+        with st.expander("Suggested constraints from parsed columns"):
+            suggestion_cols = st.columns(min(3, len(suggestions)))
+
+            for index, suggestion in enumerate(suggestions):
+                column, operator, value = suggestion
+
+                with suggestion_cols[index % len(suggestion_cols)]:
+                    if st.button(
+                        f"{column} {operator} {value}".strip(),
+                        key=f"suggestion_{selected_table['id']}_{index}",
+                        use_container_width=True
+                    ):
+                        st.session_state.validation_constraints.append({
+                            "table_id": selected_table["id"],
+                            "table_label": selected_table["label"],
+                            "file": selected_table["file"],
+                            "sheet": selected_table["sheet"],
+                            "column": column,
+                            "operator": operator,
+                            "expected_value": value,
+                        })
+
+    add_disabled = selected_operator not in ["is null", "is not null"] and not expected_value.strip()
+
+    if st.button(
+        "Add Constraint",
+        type="primary",
+        use_container_width=True,
+        disabled=add_disabled
+    ):
+        st.session_state.validation_constraints.append({
+            "table_id": selected_table["id"],
+            "table_label": selected_table["label"],
+            "file": selected_table["file"],
+            "sheet": selected_table["sheet"],
+            "column": selected_column,
+            "operator": selected_operator,
+            "expected_value": "" if selected_operator in ["is null", "is not null"] else expected_value,
+        })
+
+constraints = st.session_state.get("validation_constraints", [])
+
+if constraints:
+    st.markdown("#### Constraints To Validate")
+
+    for index, constraint in enumerate(constraints, start=1):
+        st.markdown(
+            f"{index}. `{constraint['table_label']}` | "
+            f"`{constraint['column']}` **{constraint['operator']}** "
+            f"`{constraint['expected_value']}`"
+        )
+
+    action_col1, action_col2 = st.columns([1, 1])
+
+    with action_col1:
+        clear_constraints = st.button("Clear Constraints", use_container_width=True)
+
+    with action_col2:
+        run_validation = st.button(
+            "Run SQL Validation Check",
+            type="primary",
+            use_container_width=True
+        )
+
+    if clear_constraints:
+        st.session_state.validation_constraints = []
+        st.session_state.last_validation_run = None
+        st.rerun()
+
+    if run_validation:
+        validation_results = []
+        sql_queries = []
+
+        for constraint in constraints:
+            table = get_table_by_id(parsed_tables, constraint["table_id"])
+            result = validate_constraint(
+                table,
+                constraint["column"],
+                constraint["operator"],
+                constraint["expected_value"]
+            )
+            sql_query = generate_constraint_sql(
+                table,
+                constraint["column"],
+                constraint["operator"],
+                constraint["expected_value"]
+            )
+            validation_results.append({
+                **constraint,
+                **result,
+                "sql": sql_query,
+            })
+            sql_queries.append(sql_query)
+
+        failed_constraints = sum(
+            1 for result in validation_results if result["status"] != "Passed"
+        )
+        passed_constraints = len(validation_results) - failed_constraints
+        run_status = "Passed" if failed_constraints == 0 else "Failed"
+        run_entry = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "ticket": ticket,
+            "environment": environment,
+            "status": run_status,
+            "constraints": constraints,
+            "results": validation_results,
+            "sql_queries": sql_queries,
+            "passed_constraints": passed_constraints,
+            "failed_constraints": failed_constraints,
+        }
+
+        save_validation_run(run_entry)
+        st.session_state.last_validation_run = run_entry
+
+if st.session_state.get("last_validation_run"):
+    run = st.session_state.last_validation_run
+    status_method = st.success if run["status"] == "Passed" else st.error
+    status_method(
+        f"{run['status']}: {run['passed_constraints']} passed, "
+        f"{run['failed_constraints']} failed"
+    )
+    result_tab, sql_tab = st.tabs(["Validation Results", "Generated SQL"])
+
+    with result_tab:
+        for result in run["results"]:
+            st.markdown(
+                f"**{result['status']}** - `{result['column']}` "
+                f"{result['operator']} `{result['expected_value']}`"
+            )
+            st.caption(
+                f"Checked {result['checked_rows']} rows | "
+                f"Passed {result['passed_rows']} | Failed {result['failed_rows']}"
+            )
+
+            if result["sample_failures"]:
+                st.write("Sample failed rows:")
+                st.dataframe(result["sample_failures"], use_container_width=True)
+
+    with sql_tab:
+        for query in run["sql_queries"]:
+            st.code(query, language="sql")
+
+with st.expander("Optional AI impact analysis"):
+    if "question" not in st.session_state:
+        st.session_state.question = ""
+
+    question = st.text_area(
+        "Ask your QA question",
+        placeholder="Example: What should I regression test in STF-7063?",
+        key="question"
+    )
+
+    analyze_clicked = st.button(
+        "Analyze Impact",
+        type="primary",
+        use_container_width=True
+    )
 
 # ---------------- BUTTON ----------------
 
-if st.button("Analyze Impact", type="primary", use_container_width=True):
+if analyze_clicked:
 
     ticket_content = ""
 

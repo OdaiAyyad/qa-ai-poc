@@ -91,5 +91,19 @@
             "Parsed Document",
             "Historical Investigation"
         ]
+    },
+    {
+        "timestamp": "2026-05-20T13:56:21",
+        "ticket": "STF-7142",
+        "topic": "BE - Scholarship Reset Migration / Part 2",
+        "question": "What validations are needed?",
+        "response": "## Affected Areas\n- Student records\n- Scholarship status\n- Order management\n- Discount codes\n\n## Important DB Checks\n- Verify student records are correctly updated\n- Check for correct scholarship status changes\n- Confirm order cancellations are properly recorded\n- Validate discount code updates\n\n## Risky Dependencies\n- Order cancellation logic\n- Scholarship status update dependencies\n- Discount code validation rules\n- Potential hidden dependencies on student record updates\n\n## Suggested Investigation\n- Investigate the migration file's impact on student records\n- Analyze the order cancellation process for potential issues\n- Examine the discount code update logic for correctness\n\n## Suggested Test Scenarios\n- Test a student's scholarship status is correctly reset to \"Accepted\"\n- Verify an order linked to a scholarship code is canceled\n- Check a student can reapply for a scholarship with the updated 50% discount code\n- Test the migration does not affect students not included in the provided sheet\n- Validate the discount code is correctly updated to 50%\n\n## Suggested SQL Queries\n- Purpose: Verify student records are correctly updated\n```sql\nSELECT * FROM students WHERE id IN (SELECT scholarship_id FROM provided_sheet);\n```\n- Purpose: Check for correct scholarship status changes\n```sql\nSELECT * FROM scholarships WHERE student_id IN (SELECT scholarship_id FROM provided_sheet);\n```\n- Purpose: Confirm order cancellations are properly recorded\n```sql\nSELECT * FROM orders WHERE scholarship_code IN (SELECT code FROM provided_sheet) AND status = 'canceled';\n```\n- Purpose: Validate discount code updates\n```sql\nSELECT * FROM discount_codes WHERE code IN (SELECT code FROM provided_sheet) AND discount_amount = 0.5;\n```\nNote: Table and column names must be validated before execution. \n\n## Regression Focus\n- Previous orders and scholarship applications\n- Student record updates\n- Discount code usage and validation\n- Order cancellation and refund logic",
+        "confidence_score": 92,
+        "data_sources": [
+            "Jira Ticket",
+            "Excel Attachment",
+            "Parsed Document",
+            "Historical Investigation"
+        ]
     }
 ]
