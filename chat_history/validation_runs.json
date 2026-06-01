@@ -175,5 +175,171 @@
         ],
         "passed_constraints": 1,
         "failed_constraints": 0
+    },
+    {
+        "timestamp": "2026-06-01T21:55:45",
+        "ticket": "STF-7063",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "محطوط خصم STF-7063-50  (1).xlsx::Sheet1",
+                "table_label": "محطوط خصم STF-7063-50  (1).xlsx / Sheet1",
+                "file": "محطوط خصم STF-7063-50  (1).xlsx",
+                "sheet": "Sheet1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "محطوط خصم STF-7063-50  (1).xlsx::Sheet1",
+                "table_label": "محطوط خصم STF-7063-50  (1).xlsx / Sheet1",
+                "file": "محطوط خصم STF-7063-50  (1).xlsx",
+                "sheet": "Sheet1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033",
+                "status": "Failed",
+                "checked_rows": 236,
+                "passed_rows": 1,
+                "failed_rows": 235,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "20686"
+                    },
+                    {
+                        "row": 3,
+                        "value": "20264"
+                    },
+                    {
+                        "row": 4,
+                        "value": "20118"
+                    },
+                    {
+                        "row": 5,
+                        "value": "20062"
+                    },
+                    {
+                        "row": 6,
+                        "value": "19794"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_50_1_xlsx_sheet1\nWHERE (id <> 9033 OR id IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_50_1_xlsx_sheet1\nWHERE (id <> 9033 OR id IS NULL);"
+        ],
+        "passed_constraints": 0,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-01T21:56:43",
+        "ticket": "STF-7063",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "محطوط خصم STF-7063-50  (1).xlsx::Sheet1",
+                "table_label": "محطوط خصم STF-7063-50  (1).xlsx / Sheet1",
+                "file": "محطوط خصم STF-7063-50  (1).xlsx",
+                "sheet": "Sheet1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033"
+            },
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "محطوط خصم STF-7063-50  (1).xlsx::Sheet1",
+                "table_label": "محطوط خصم STF-7063-50  (1).xlsx / Sheet1",
+                "file": "محطوط خصم STF-7063-50  (1).xlsx",
+                "sheet": "Sheet1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033",
+                "status": "Failed",
+                "checked_rows": 236,
+                "passed_rows": 1,
+                "failed_rows": 235,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "20686"
+                    },
+                    {
+                        "row": 3,
+                        "value": "20264"
+                    },
+                    {
+                        "row": 4,
+                        "value": "20118"
+                    },
+                    {
+                        "row": 5,
+                        "value": "20062"
+                    },
+                    {
+                        "row": 6,
+                        "value": "19794"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_50_1_xlsx_sheet1\nWHERE (id <> 9033 OR id IS NULL);"
+            },
+            {
+                "table_id": "STF-7063-joacademy_db_scholarships_2.xlsx::Result 1",
+                "table_label": "STF-7063-joacademy_db_scholarships_2.xlsx / Result 1",
+                "file": "STF-7063-joacademy_db_scholarships_2.xlsx",
+                "sheet": "Result 1",
+                "column": "id",
+                "operator": "equals",
+                "expected_value": "9033",
+                "status": "Failed",
+                "checked_rows": 500,
+                "passed_rows": 1,
+                "failed_rows": 499,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "9031"
+                    },
+                    {
+                        "row": 4,
+                        "value": "9088"
+                    },
+                    {
+                        "row": 5,
+                        "value": "9124"
+                    },
+                    {
+                        "row": 6,
+                        "value": "9147"
+                    },
+                    {
+                        "row": 7,
+                        "value": "9149"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (id <> 9033 OR id IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_50_1_xlsx_sheet1\nWHERE (id <> 9033 OR id IS NULL);",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7063_joacademy_db_scholarships_2_xlsx_result_1\nWHERE (id <> 9033 OR id IS NULL);"
+        ],
+        "passed_constraints": 0,
+        "failed_constraints": 2
     }
 ]

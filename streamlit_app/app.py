@@ -133,11 +133,6 @@ def summarize_dataframe(df, source_name):
                     f"Sample values for {column}: {', '.join(values)}"
                 )
 
-    if not df.empty:
-        preview = df.head(MAX_ATTACHMENT_PREVIEW_ROWS).fillna("").astype(str)
-        summary.append("Preview rows:")
-        summary.append(preview.to_string(index=False))
-
     return "\n".join(summary)
 
 
@@ -178,14 +173,6 @@ def summarize_table(headers, rows, source_name, total_rows=None):
                 summary.append(
                     f"Sample values for {column}: {', '.join(values)}"
                 )
-
-    if rows:
-        summary.append("Preview rows:")
-        summary.append("\t".join(headers))
-
-        for row in rows[:MAX_ATTACHMENT_PREVIEW_ROWS]:
-            padded_row = row + [""] * max(0, len(headers) - len(row))
-            summary.append("\t".join(padded_row[:len(headers)]))
 
     return "\n".join(summary)
 
@@ -507,10 +494,10 @@ def save_validation_run(run_entry):
 
 def render_validation_history_sidebar():
     runs = read_json_file(VALIDATION_HISTORY_FILE, [])
-    st.sidebar.markdown("## SQL Query History")
+    st.sidebar.markdown("## SQL History")
 
     if not runs:
-        st.sidebar.caption("No SQL validation runs yet.")
+        st.sidebar.caption("No validation runs yet.")
         return
 
     sorted_runs = sorted(
@@ -518,24 +505,27 @@ def render_validation_history_sidebar():
         key=lambda run: parse_timestamp(run.get("timestamp", "")),
         reverse=True
     )
+    grouped_runs = {}
 
-    for run in sorted_runs[:12]:
-        run_title = (
-            f"{run.get('ticket', 'Ticket')} - "
-            f"{run.get('environment', 'Env')} - "
-            f"{run.get('status', 'Status')}"
-        )
+    for run in sorted_runs:
+        grouped_runs.setdefault(run.get("ticket", "Unknown Ticket"), []).append(run)
 
-        with st.sidebar.expander(run_title):
-            st.caption(format_timestamp(run.get("timestamp", "")))
-            st.write(f"Constraints: {len(run.get('constraints', []))}")
-            st.write(f"Passed: {run.get('passed_constraints', 0)}")
-            st.write(f"Failed: {run.get('failed_constraints', 0)}")
+    for ticket_id, ticket_runs in list(grouped_runs.items())[:8]:
+        with st.sidebar.expander(f"{ticket_id} ({len(ticket_runs)} runs)"):
+            for index, run in enumerate(ticket_runs[:8], start=1):
+                label = (
+                    f"Run {index}: {run.get('status', 'Status')} - "
+                    f"{run.get('environment', 'Env')}"
+                )
 
-            if run.get("sql_queries"):
-                with st.expander("SQL"):
-                    for query in run["sql_queries"]:
-                        st.code(query, language="sql")
+                if st.button(
+                    label,
+                    key=f"history_{ticket_id}_{run.get('timestamp', index)}",
+                    use_container_width=True
+                ):
+                    st.session_state.selected_history_run = run
+
+                st.caption(format_timestamp(run.get("timestamp", "")))
 
 
 @st.cache_data(show_spinner=False)
@@ -1200,7 +1190,7 @@ st.markdown(
 )
 
 st.caption(
-    "POC flow: 1) parse ticket attachments and discover fields, 2) validate constraints and save generated SQL checks."
+    "Simple flow: select a ticket, load its file fields, add validation checks, then run and save the SQL-style result."
 )
 
 col1, col2 = st.columns(2)
@@ -1228,40 +1218,16 @@ unsupported_attachment_count = 0
 
 render_validation_history_sidebar()
 
-st.sidebar.markdown("## Ticket Context")
+st.sidebar.markdown("## Current Ticket")
 st.sidebar.markdown(
     f"""
     <div class="sidebar-context-card">
         <div class="context-row"><strong>Ticket</strong><span>{html.escape(ticket)}</span></div>
-        <div class="context-row"><strong>Env</strong><span>{html.escape(environment)}</span></div>
-        <div class="context-row"><strong>Attachments</strong><span>{attachment_count}</span></div>
+        <div class="context-row"><strong>Files</strong><span>{attachment_count}</span></div>
     </div>
     """,
     unsafe_allow_html=True
 )
-
-if ticket_attachments:
-    with st.sidebar.expander("📎 Attachment names"):
-        for attachment in ticket_attachments:
-            st.markdown(f"- `{attachment}`")
-
-    if st.sidebar.button("Preview Attachment Data", use_container_width=True):
-        with st.spinner("Reading Excel/CSV attachments..."):
-            (
-                attachment_summary,
-                parsed_attachment_count,
-                unsupported_attachment_count
-            ) = build_attachment_content_summary(tuple(ticket_attachments))
-
-        if attachment_summary:
-            st.sidebar.markdown("#### 📊 Attachment Summary")
-            st.sidebar.caption(
-                f"Parsed tabular files: {parsed_attachment_count} | "
-                f"Unsupported files: {unsupported_attachment_count}"
-            )
-            st.sidebar.code(attachment_summary[:3500])
-        else:
-            st.sidebar.info("No Excel or CSV attachment content found for this ticket.")
 
 if (
     "attachment_summary_by_ticket" not in st.session_state
@@ -1275,12 +1241,8 @@ if attachment_summary:
 else:
     attachment_summary = st.session_state.attachment_summary_by_ticket
 
-if attachment_summary and not st.session_state.get("hide_attachment_summary", False):
-    with st.sidebar.expander("📊 Current attachment summary", expanded=False):
-        st.code(attachment_summary[:3500])
-
 if not ticket_attachments:
-    st.sidebar.info("No attachments found for this ticket.")
+    st.sidebar.caption("No files for this ticket.")
 
 if (
     "constraint_ticket" not in st.session_state
@@ -1291,15 +1253,14 @@ if (
     st.session_state.validation_constraints = []
     st.session_state.last_validation_run = None
 
-st.markdown("### Step 1 - Business Data Understanding")
-st.caption(
-    "Load ticket attachments to discover sheets, columns, key identifiers, and likely validation fields."
-)
+st.markdown("### 1. Load Ticket Data")
 
-st.markdown("### Step 2 - SQL-Style Constraint Validation")
-st.caption(
-    "Load attachment fields, define critical constraints, validate them against the parsed files, and generate read-only SQL checks."
-)
+if ticket_attachments:
+    st.info(
+        f"{ticket} has {attachment_count} attachment(s). Load the fields to see available sheets and columns."
+    )
+else:
+    st.warning("No attachments are available for this ticket, so file-based validation cannot run yet.")
 
 if ticket_attachments:
     if st.button("Load Attachment Fields", use_container_width=True):
@@ -1313,13 +1274,26 @@ if ticket_attachments:
         st.session_state.parsed_errors = parse_errors
 
     if not st.session_state.parsed_tables:
-        st.info("Load attachment fields to start building SQL validation constraints.")
-else:
-    st.warning("No attachments are available for this ticket, so file-based validation cannot run yet.")
+        st.caption("Nothing is loaded yet. Click the button above to start.")
 
 parsed_tables = st.session_state.get("parsed_tables", [])
 
 if parsed_tables:
+    st.markdown("### 2. Choose What To Validate")
+
+    overview_rows = []
+
+    for table in parsed_tables:
+        overview_rows.append({
+            "File / sheet": table["label"],
+            "Rows": table["total_rows"],
+            "Columns": len(table["columns"]),
+            "Suggested fields": ", ".join(get_interesting_columns(table["columns"])[:5]) or "-"
+        })
+
+    with st.expander("Loaded file fields", expanded=True):
+        st.dataframe(overview_rows, use_container_width=True, hide_index=True)
+
     table_options = {
         table["label"]: table["id"]
         for table in parsed_tables
@@ -1350,14 +1324,13 @@ if parsed_tables:
         )
 
     st.caption(
-        f"Rows available in selected sheet: {selected_table['total_rows']} "
-        f"(preview validation uses up to {len(selected_table['rows'])} rows)"
+        f"Rows available in selected sheet: {selected_table['total_rows']}."
     )
 
     suggestions = suggest_constraints_for_table(selected_table)
 
     if suggestions:
-        with st.expander("Suggested constraints from parsed columns"):
+        with st.expander("Quick constraint suggestions"):
             suggestion_cols = st.columns(min(3, len(suggestions)))
 
             for index, suggestion in enumerate(suggestions):
@@ -1400,7 +1373,8 @@ if parsed_tables:
 constraints = st.session_state.get("validation_constraints", [])
 
 if constraints:
-    st.markdown("#### Constraints To Validate")
+    st.markdown("### 3. Run Validation")
+    st.caption("These checks will be validated against the loaded file data and saved as SQL-style history.")
 
     for index, constraint in enumerate(constraints, start=1):
         st.markdown(
@@ -1473,6 +1447,7 @@ if constraints:
 
 if st.session_state.get("last_validation_run"):
     run = st.session_state.last_validation_run
+    st.markdown("### 4. Review Result")
     status_method = st.success if run["status"] == "Passed" else st.error
     status_method(
         f"{run['status']}: {run['passed_constraints']} passed, "
@@ -1497,6 +1472,24 @@ if st.session_state.get("last_validation_run"):
 
     with sql_tab:
         for query in run["sql_queries"]:
+            st.code(query, language="sql")
+
+selected_history_run = st.session_state.get("selected_history_run")
+
+if selected_history_run:
+    with st.expander("Selected history run", expanded=False):
+        st.markdown(
+            f"**{selected_history_run.get('ticket', 'Ticket')}** | "
+            f"{selected_history_run.get('environment', 'Env')} | "
+            f"**{selected_history_run.get('status', 'Status')}**"
+        )
+        st.caption(format_timestamp(selected_history_run.get("timestamp", "")))
+        st.write(
+            f"{selected_history_run.get('passed_constraints', 0)} passed, "
+            f"{selected_history_run.get('failed_constraints', 0)} failed"
+        )
+
+        for query in selected_history_run.get("sql_queries", []):
             st.code(query, language="sql")
 
 with st.expander("Optional natural-language helper"):
@@ -1673,3 +1666,4 @@ if analyze_clicked:
 
     render_grounding_panel(confidence_score, data_sources)
     render_ai_analysis(ai_response)
+

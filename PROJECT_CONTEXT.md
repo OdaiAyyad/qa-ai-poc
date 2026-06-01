@@ -192,6 +192,29 @@ The old AI question/search history is no longer the main history model. The proj
 
 The optional natural-language helper can remain for support, but it should not be treated as the core workflow or main saved history.
 
+## Latest UX Simplification
+
+The app should feel like a small validation workflow, not a generic investigation dashboard.
+
+Current simplified UI direction:
+
+1. Keep the sidebar minimal.
+   - Show only the current ticket and SQL history.
+   - Do not show attachment previews, raw summaries, long SQL blocks, or duplicate ticket entries in the sidebar.
+2. Group history by ticket ID.
+   - The ticket should appear once.
+   - Each saved validation attempt appears inside that ticket as Run 1, Run 2, etc.
+3. Remove raw file-like summaries from the sidebar.
+   - File summaries should not repeat the whole file or preview many rows.
+   - After loading files, show a compact table overview in the main page: file/sheet, row count, column count, and suggested fields.
+4. Keep the main page as the workflow.
+   - 1. Load Ticket Data
+   - 2. Choose What To Validate
+   - 3. Run Validation
+   - 4. Review Result
+
+This is intended to make the POC easier for managers and QA members to understand quickly.
+
 ## Desired Future Workflow
 
 ### 1. Ticket And File Parsing
