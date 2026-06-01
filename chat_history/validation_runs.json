@@ -341,5 +341,796 @@
         ],
         "passed_constraints": 0,
         "failed_constraints": 2
+    },
+    {
+        "timestamp": "2026-06-01T22:56:24",
+        "ticket": "STF-7142",
+        "environment": "Preprod",
+        "status": "Passed",
+        "constraints": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100",
+                "status": "Passed",
+                "checked_rows": 9,
+                "passed_rows": 9,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 0
+    },
+    {
+        "timestamp": "2026-06-01T22:56:55",
+        "ticket": "STF-7142",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100",
+                "status": "Passed",
+                "checked_rows": 9,
+                "passed_rows": 9,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50",
+                "status": "Failed",
+                "checked_rows": 9,
+                "passed_rows": 0,
+                "failed_rows": 9,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "100"
+                    },
+                    {
+                        "row": 3,
+                        "value": "100"
+                    },
+                    {
+                        "row": 4,
+                        "value": "100"
+                    },
+                    {
+                        "row": 5,
+                        "value": "100"
+                    },
+                    {
+                        "row": 6,
+                        "value": "100"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-01T23:01:36",
+        "ticket": "STF-7142",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "not equals",
+                "expected_value": "100",
+                "status": "Passed",
+                "checked_rows": 9,
+                "passed_rows": 9,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50",
+                "status": "Failed",
+                "checked_rows": 9,
+                "passed_rows": 0,
+                "failed_rows": 9,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "100"
+                    },
+                    {
+                        "row": 3,
+                        "value": "100"
+                    },
+                    {
+                        "row": 4,
+                        "value": "100"
+                    },
+                    {
+                        "row": 5,
+                        "value": "100"
+                    },
+                    {
+                        "row": 6,
+                        "value": "100"
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+            },
+            {
+                "table_id": "STF-7142-foooz.xlsx::codat",
+                "table_label": "STF-7142-foooz.xlsx / codat",
+                "file": "STF-7142-foooz.xlsx",
+                "sheet": "codat",
+                "column": "scholarship_id",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 9,
+                "passed_rows": 9,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (scholarship_id IS NULL OR scholarship_id = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE scholarship_id = 100;",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7142_foooz_xlsx_codat\nWHERE (scholarship_id IS NULL OR scholarship_id = '');"
+        ],
+        "passed_constraints": 2,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-01T23:03:54",
+        "ticket": "STF-7396",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-7396-scholarship_gifts.xlsx::Result 1",
+                "table_label": "STF-7396-scholarship_gifts.xlsx / Result 1",
+                "file": "STF-7396-scholarship_gifts.xlsx",
+                "sheet": "Result 1",
+                "column": "discount_percentage",
+                "operator": "equals",
+                "expected_value": "50"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-7396-scholarship_gifts.xlsx::Result 1",
+                "table_label": "STF-7396-scholarship_gifts.xlsx / Result 1",
+                "file": "STF-7396-scholarship_gifts.xlsx",
+                "sheet": "Result 1",
+                "column": "discount_percentage",
+                "operator": "equals",
+                "expected_value": "50",
+                "status": "Failed",
+                "checked_rows": 8,
+                "passed_rows": 0,
+                "failed_rows": 8,
+                "sample_failures": [
+                    {
+                        "row": 2,
+                        "value": "50%"
+                    },
+                    {
+                        "row": 3,
+                        "value": "50%"
+                    },
+                    {
+                        "row": 4,
+                        "value": "50%"
+                    },
+                    {
+                        "row": 5,
+                        "value": "50%"
+                    },
+                    {
+                        "row": 6,
+                        "value": "50%"
+                    }
+                ],
+                "sample_passes": [],
+                "value_counts": [
+                    {
+                        "value": "50%",
+                        "count": 8
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7396_scholarship_gifts_xlsx_result_1\nWHERE (discount_percentage <> 50 OR discount_percentage IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\nSELECT *\nFROM stf_7396_scholarship_gifts_xlsx_result_1\nWHERE (discount_percentage <> 50 OR discount_percentage IS NULL);"
+        ],
+        "passed_constraints": 0,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-01T23:12:55",
+        "ticket": "STF-8104",
+        "environment": "Preprod",
+        "status": "Passed",
+        "constraints": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 61,
+                "passed_rows": 61,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "962792553049"
+                    },
+                    {
+                        "row": 3,
+                        "value": "962779582738"
+                    },
+                    {
+                        "row": 4,
+                        "value": "962780943549"
+                    },
+                    {
+                        "row": 5,
+                        "value": "962797643052"
+                    },
+                    {
+                        "row": 6,
+                        "value": "962796825542"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "962792553049",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779582738",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780943549",
+                        "count": 1
+                    },
+                    {
+                        "value": "962797643052",
+                        "count": 1
+                    },
+                    {
+                        "value": "962796825542",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780999272",
+                        "count": 1
+                    },
+                    {
+                        "value": "962792007139",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779130029",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 0
+    },
+    {
+        "timestamp": "2026-06-01T23:13:09",
+        "ticket": "STF-8104",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": ""
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50"
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 61,
+                "passed_rows": 61,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "962792553049"
+                    },
+                    {
+                        "row": 3,
+                        "value": "962779582738"
+                    },
+                    {
+                        "row": 4,
+                        "value": "962780943549"
+                    },
+                    {
+                        "row": 5,
+                        "value": "962797643052"
+                    },
+                    {
+                        "row": 6,
+                        "value": "962796825542"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "962792553049",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779582738",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780943549",
+                        "count": 1
+                    },
+                    {
+                        "value": "962797643052",
+                        "count": 1
+                    },
+                    {
+                        "value": "962796825542",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780999272",
+                        "count": 1
+                    },
+                    {
+                        "value": "962792007139",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779130029",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');"
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50",
+                "status": "Failed",
+                "checked_rows": 124,
+                "passed_rows": 123,
+                "failed_rows": 1,
+                "sample_failures": [
+                    {
+                        "row": 15,
+                        "value": "30.0"
+                    }
+                ],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 3,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 4,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 5,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 6,
+                        "value": "50.0"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "50.0",
+                        "count": 123
+                    },
+                    {
+                        "value": "30.0",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+        ],
+        "passed_constraints": 1,
+        "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-01T23:15:19",
+        "ticket": "STF-8104",
+        "environment": "Preprod",
+        "status": "Failed",
+        "constraints": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": ""
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50"
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "coupon_code_id",
+                "operator": "is not null",
+                "expected_value": ""
+            }
+        ],
+        "results": [
+            {
+                "table_id": "STF-8104-mobilesScholarShipchangeDiscount.csv::CSV",
+                "table_label": "STF-8104-mobilesScholarShipchangeDiscount.csv / CSV",
+                "file": "STF-8104-mobilesScholarShipchangeDiscount.csv",
+                "sheet": "CSV",
+                "column": "mobile",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 61,
+                "passed_rows": 61,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "962792553049"
+                    },
+                    {
+                        "row": 3,
+                        "value": "962779582738"
+                    },
+                    {
+                        "row": 4,
+                        "value": "962780943549"
+                    },
+                    {
+                        "row": 5,
+                        "value": "962797643052"
+                    },
+                    {
+                        "row": 6,
+                        "value": "962796825542"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "962792553049",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779582738",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780943549",
+                        "count": 1
+                    },
+                    {
+                        "value": "962797643052",
+                        "count": 1
+                    },
+                    {
+                        "value": "962796825542",
+                        "count": 1
+                    },
+                    {
+                        "value": "962780999272",
+                        "count": 1
+                    },
+                    {
+                        "value": "962792007139",
+                        "count": 1
+                    },
+                    {
+                        "value": "962779130029",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');"
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "discount_amount",
+                "operator": "equals",
+                "expected_value": "50",
+                "status": "Failed",
+                "checked_rows": 124,
+                "passed_rows": 123,
+                "failed_rows": 1,
+                "sample_failures": [
+                    {
+                        "row": 15,
+                        "value": "30.0"
+                    }
+                ],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 3,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 4,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 5,
+                        "value": "50.0"
+                    },
+                    {
+                        "row": 6,
+                        "value": "50.0"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "50.0",
+                        "count": 123
+                    },
+                    {
+                        "value": "30.0",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);"
+            },
+            {
+                "table_id": "STF-8104-discountscholarshipschangeto50.xlsx::Query result",
+                "table_label": "STF-8104-discountscholarshipschangeto50.xlsx / Query result",
+                "file": "STF-8104-discountscholarshipschangeto50.xlsx",
+                "sheet": "Query result",
+                "column": "coupon_code_id",
+                "operator": "is not null",
+                "expected_value": "",
+                "status": "Passed",
+                "checked_rows": 124,
+                "passed_rows": 124,
+                "failed_rows": 0,
+                "sample_failures": [],
+                "sample_passes": [
+                    {
+                        "row": 2,
+                        "value": "15012.0"
+                    },
+                    {
+                        "row": 3,
+                        "value": "33285.0"
+                    },
+                    {
+                        "row": 4,
+                        "value": "14659.0"
+                    },
+                    {
+                        "row": 5,
+                        "value": "36952.0"
+                    },
+                    {
+                        "row": 6,
+                        "value": "14194.0"
+                    }
+                ],
+                "value_counts": [
+                    {
+                        "value": "15012.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "33285.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "14659.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "36952.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "14194.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "34712.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "15241.0",
+                        "count": 1
+                    },
+                    {
+                        "value": "34237.0",
+                        "count": 1
+                    }
+                ],
+                "sql": "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (coupon_code_id IS NULL OR coupon_code_id = '');"
+            }
+        ],
+        "sql_queries": [
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_mobilesscholarshipchangediscount_csv_csv\nWHERE (mobile IS NULL OR mobile = '');",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (discount_amount <> 50 OR discount_amount IS NULL);",
+            "-- Suggested read-only validation query\n-- Replace table/column names with the real DB schema before execution.\n-- If the source file contains percentages, confirm how the DB stores them.\nSELECT *\nFROM stf_8104_discountscholarshipschangeto50_xlsx_query_result\nWHERE (coupon_code_id IS NULL OR coupon_code_id = '');"
+        ],
+        "passed_constraints": 2,
+        "failed_constraints": 1
     }
 ]

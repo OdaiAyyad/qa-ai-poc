@@ -209,9 +209,12 @@ Current simplified UI direction:
    - After loading files, show a compact table overview in the main page: file/sheet, row count, column count, and suggested fields.
 4. Keep the main page as the workflow.
    - 1. Load Ticket Data
-   - 2. Choose What To Validate
-   - 3. Run Validation
-   - 4. Review Result
+   - 2. Data Quality Check
+   - 3. Choose What To Validate
+   - 4. Run Validation
+   - 5. Review Result
+
+The data quality check should run before constraint building. If duplicated full rows are found in a parsed attachment table, the app should block only that duplicated file/sheet, show duplicate samples, remove pending constraints for the blocked file/sheet, and still allow validation on other clean files/sheets under the same ticket. If every file/sheet has duplicates, the app should refuse validation until at least one clean file/sheet is available.
 
 This is intended to make the POC easier for managers and QA members to understand quickly.
 

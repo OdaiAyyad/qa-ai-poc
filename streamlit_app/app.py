@@ -246,10 +246,54 @@ def normalize_cell_value(value):
 
 
 def parse_number(value):
+    cleaned_value = str(value).strip().replace(",", "")
+
+    if cleaned_value.endswith("%"):
+        cleaned_value = cleaned_value[:-1].strip()
+
     try:
-        return float(str(value).strip())
+        return float(cleaned_value)
     except ValueError:
         return None
+
+
+def values_match(actual, expected):
+    actual_number = parse_number(actual)
+    expected_number = parse_number(expected)
+
+    if actual_number is not None and expected_number is not None:
+        return actual_number == expected_number
+
+    return actual.lower() == expected.lower()
+
+
+def get_normalized_row(row, width):
+    padded_row = list(row) + [""] * max(0, width - len(row))
+
+    return tuple(
+        normalize_cell_value(value).strip().lower()
+        for value in padded_row[:width]
+    )
+
+
+def update_duplicate_check(row, row_number, width, seen_rows, duplicate_samples):
+    normalized_row = get_normalized_row(row, width)
+
+    if not any(normalized_row):
+        return 0
+
+    if normalized_row in seen_rows:
+        if len(duplicate_samples) < 5:
+            duplicate_samples.append({
+                "row": row_number,
+                "duplicates row": seen_rows[normalized_row],
+                "values": " | ".join(normalized_row[:8]),
+            })
+
+        return 1
+
+    seen_rows[normalized_row] = row_number
+    return 0
 
 
 def read_csv_table(file_path, attachment):
@@ -258,9 +302,19 @@ def read_csv_table(file_path, attachment):
         headers = [str(header) for header in next(reader, [])]
         rows = []
         total_rows = 0
+        duplicate_count = 0
+        duplicate_samples = []
+        seen_rows = {}
 
-        for row in reader:
+        for row_number, row in enumerate(reader, start=2):
             total_rows += 1
+            duplicate_count += update_duplicate_check(
+                row,
+                row_number,
+                len(headers),
+                seen_rows,
+                duplicate_samples
+            )
 
             if len(rows) < MAX_VALIDATION_ROWS:
                 rows.append(row)
@@ -273,6 +327,8 @@ def read_csv_table(file_path, attachment):
         "columns": headers,
         "rows": rows,
         "total_rows": total_rows,
+        "duplicate_count": duplicate_count,
+        "duplicate_samples": duplicate_samples,
     }]
 
 
@@ -289,12 +345,23 @@ def read_excel_tables(file_path, attachment):
         headers = [str(header) if header is not None else "" for header in next(rows_iterator, [])]
         rows = []
         total_rows = 0
+        duplicate_count = 0
+        duplicate_samples = []
+        seen_rows = {}
 
-        for row in rows_iterator:
+        for row_number, row in enumerate(rows_iterator, start=2):
             total_rows += 1
+            normalized_values = ["" if value is None else str(value) for value in row]
+            duplicate_count += update_duplicate_check(
+                normalized_values,
+                row_number,
+                len(headers),
+                seen_rows,
+                duplicate_samples
+            )
 
             if len(rows) < MAX_VALIDATION_ROWS:
-                rows.append(["" if value is None else str(value) for value in row])
+                rows.append(normalized_values)
 
         tables.append({
             "id": f"{attachment}::{sheet.title}",
@@ -304,6 +371,8 @@ def read_excel_tables(file_path, attachment):
             "columns": headers,
             "rows": rows,
             "total_rows": total_rows,
+            "duplicate_count": duplicate_count,
+            "duplicate_samples": duplicate_samples,
         })
 
     workbook.close()
@@ -346,9 +415,9 @@ def evaluate_constraint(row_value, operator, expected_value):
     expected = normalize_cell_value(expected_value)
 
     if operator == "equals":
-        return actual.lower() == expected.lower()
+        return values_match(actual, expected)
     if operator == "not equals":
-        return actual.lower() != expected.lower()
+        return not values_match(actual, expected)
     if operator == "contains":
         return expected.lower() in actual.lower()
     if operator == "is not null":
@@ -382,27 +451,48 @@ def validate_constraint(table, column, operator, expected_value):
             "passed_rows": 0,
             "failed_rows": 0,
             "sample_failures": [],
+            "sample_passes": [],
+            "value_counts": [],
         }
 
     column_index = table["columns"].index(column)
     checked_rows = 0
     passed_rows = 0
     sample_failures = []
+    sample_passes = []
+    value_counts = {}
 
     for row_number, row in enumerate(table["rows"], start=2):
         checked_rows += 1
         row_value = row[column_index] if column_index < len(row) else ""
+        normalized_value = normalize_cell_value(row_value)
         passed = evaluate_constraint(row_value, operator, expected_value)
+        value_counts[normalized_value or "(blank)"] = (
+            value_counts.get(normalized_value or "(blank)", 0) + 1
+        )
 
         if passed:
             passed_rows += 1
+            if len(sample_passes) < 5:
+                sample_passes.append({
+                    "row": row_number,
+                    "value": normalized_value,
+                })
         elif len(sample_failures) < 5:
             sample_failures.append({
                 "row": row_number,
-                "value": normalize_cell_value(row_value),
+                "value": normalized_value,
             })
 
     failed_rows = checked_rows - passed_rows
+    top_values = [
+        {"value": value, "count": count}
+        for value, count in sorted(
+            value_counts.items(),
+            key=lambda item: item[1],
+            reverse=True
+        )[:8]
+    ]
 
     return {
         "status": "Passed" if failed_rows == 0 and checked_rows > 0 else "Failed",
@@ -410,6 +500,8 @@ def validate_constraint(table, column, operator, expected_value):
         "passed_rows": passed_rows,
         "failed_rows": failed_rows,
         "sample_failures": sample_failures,
+        "sample_passes": sample_passes,
+        "value_counts": top_values,
     }
 
 
@@ -446,6 +538,7 @@ def generate_constraint_sql(table, column, operator, expected_value):
     return "\n".join([
         "-- Suggested read-only validation query",
         "-- Replace table/column names with the real DB schema before execution.",
+        "-- If the source file contains percentages, confirm how the DB stores them.",
         f"SELECT *",
         f"FROM {table_name}",
         f"WHERE {where_clause};",
@@ -1279,101 +1372,157 @@ if ticket_attachments:
 parsed_tables = st.session_state.get("parsed_tables", [])
 
 if parsed_tables:
-    st.markdown("### 2. Choose What To Validate")
+    st.markdown("### 2. Data Quality Check")
 
     overview_rows = []
+    duplicate_tables = [
+        table
+        for table in parsed_tables
+        if table.get("duplicate_count", 0) > 0
+    ]
+    clean_tables = [
+        table
+        for table in parsed_tables
+        if table.get("duplicate_count", 0) == 0
+    ]
 
     for table in parsed_tables:
         overview_rows.append({
             "File / sheet": table["label"],
             "Rows": table["total_rows"],
             "Columns": len(table["columns"]),
+            "Duplicate rows": table.get("duplicate_count", 0),
             "Suggested fields": ", ".join(get_interesting_columns(table["columns"])[:5]) or "-"
         })
 
     with st.expander("Loaded file fields", expanded=True):
         st.dataframe(overview_rows, use_container_width=True, hide_index=True)
 
-    table_options = {
-        table["label"]: table["id"]
-        for table in parsed_tables
-    }
-
-    builder_col1, builder_col2 = st.columns([1.2, 0.8])
-
-    with builder_col1:
-        selected_table_label = st.selectbox(
-            "Parsed file / sheet",
-            list(table_options.keys())
-        )
-        selected_table = get_table_by_id(
-            parsed_tables,
-            table_options[selected_table_label]
-        )
-        selected_column = st.selectbox(
-            "Column",
-            selected_table["columns"]
+    if duplicate_tables:
+        blocked_table_ids = {
+            table["id"]
+            for table in duplicate_tables
+        }
+        st.session_state.validation_constraints = [
+            constraint
+            for constraint in st.session_state.validation_constraints
+            if constraint.get("table_id") not in blocked_table_ids
+        ]
+        st.warning(
+            "Some files/sheets have duplicated rows and are blocked. "
+            "You can still validate the clean files/sheets below."
         )
 
-    with builder_col2:
-        selected_operator = st.selectbox("Constraint", CONSTRAINT_OPERATORS)
-        expected_value = st.text_input(
-            "Expected value",
-            disabled=selected_operator in ["is null", "is not null"],
-            placeholder="Example: 50, Accepted, 100"
+        for table in duplicate_tables:
+            st.markdown(
+                f"**{table['label']}** has "
+                f"`{table.get('duplicate_count', 0)}` duplicated row(s)."
+            )
+
+            if table.get("duplicate_samples"):
+                st.dataframe(
+                    table["duplicate_samples"],
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+    if clean_tables:
+        if duplicate_tables:
+            st.success(f"{len(clean_tables)} clean file/sheet(s) are available for validation.")
+        else:
+            st.success("No duplicated rows found. You can continue to validation.")
+
+        st.markdown("### 3. Choose What To Validate")
+
+        table_options = {
+            table["label"]: table["id"]
+            for table in clean_tables
+        }
+
+        builder_col1, builder_col2 = st.columns([1.2, 0.8])
+
+        with builder_col1:
+            selected_table_label = st.selectbox(
+                "Parsed file / sheet",
+                list(table_options.keys())
+            )
+            selected_table = get_table_by_id(
+                clean_tables,
+                table_options[selected_table_label]
+            )
+            selected_column = st.selectbox(
+                "Column",
+                selected_table["columns"]
+            )
+
+        with builder_col2:
+            selected_operator = st.selectbox("Constraint", CONSTRAINT_OPERATORS)
+            expected_value = st.text_input(
+                "Expected value",
+                disabled=selected_operator in ["is null", "is not null"],
+                placeholder="Example: 50, Accepted, 100"
+            )
+
+        st.caption(
+            f"Rows available in selected sheet: {selected_table['total_rows']}."
         )
 
-    st.caption(
-        f"Rows available in selected sheet: {selected_table['total_rows']}."
-    )
+        suggestions = suggest_constraints_for_table(selected_table)
 
-    suggestions = suggest_constraints_for_table(selected_table)
+        if suggestions:
+            with st.expander("Quick constraint suggestions"):
+                suggestion_cols = st.columns(min(3, len(suggestions)))
 
-    if suggestions:
-        with st.expander("Quick constraint suggestions"):
-            suggestion_cols = st.columns(min(3, len(suggestions)))
+                for index, suggestion in enumerate(suggestions):
+                    column, operator, value = suggestion
 
-            for index, suggestion in enumerate(suggestions):
-                column, operator, value = suggestion
+                    with suggestion_cols[index % len(suggestion_cols)]:
+                        if st.button(
+                            f"{column} {operator} {value}".strip(),
+                            key=f"suggestion_{selected_table['id']}_{index}",
+                            use_container_width=True
+                        ):
+                            st.session_state.validation_constraints.append({
+                                "table_id": selected_table["id"],
+                                "table_label": selected_table["label"],
+                                "file": selected_table["file"],
+                                "sheet": selected_table["sheet"],
+                                "column": column,
+                                "operator": operator,
+                                "expected_value": value,
+                            })
 
-                with suggestion_cols[index % len(suggestion_cols)]:
-                    if st.button(
-                        f"{column} {operator} {value}".strip(),
-                        key=f"suggestion_{selected_table['id']}_{index}",
-                        use_container_width=True
-                    ):
-                        st.session_state.validation_constraints.append({
-                            "table_id": selected_table["id"],
-                            "table_label": selected_table["label"],
-                            "file": selected_table["file"],
-                            "sheet": selected_table["sheet"],
-                            "column": column,
-                            "operator": operator,
-                            "expected_value": value,
-                        })
+        add_disabled = selected_operator not in ["is null", "is not null"] and not expected_value.strip()
 
-    add_disabled = selected_operator not in ["is null", "is not null"] and not expected_value.strip()
-
-    if st.button(
-        "Add Constraint",
-        type="primary",
-        use_container_width=True,
-        disabled=add_disabled
-    ):
-        st.session_state.validation_constraints.append({
-            "table_id": selected_table["id"],
-            "table_label": selected_table["label"],
-            "file": selected_table["file"],
-            "sheet": selected_table["sheet"],
-            "column": selected_column,
-            "operator": selected_operator,
-            "expected_value": "" if selected_operator in ["is null", "is not null"] else expected_value,
-        })
+        if st.button(
+            "Add Constraint",
+            type="primary",
+            use_container_width=True,
+            disabled=add_disabled
+        ):
+            st.session_state.validation_constraints.append({
+                "table_id": selected_table["id"],
+                "table_label": selected_table["label"],
+                "file": selected_table["file"],
+                "sheet": selected_table["sheet"],
+                "column": selected_column,
+                "operator": selected_operator,
+                "expected_value": "" if selected_operator in ["is null", "is not null"] else expected_value,
+            })
+    elif duplicate_tables:
+        st.error(
+            "All loaded files/sheets have duplicates, so there is nothing clean to validate yet."
+        )
 
 constraints = st.session_state.get("validation_constraints", [])
+validation_tables = [
+    table
+    for table in parsed_tables
+    if table.get("duplicate_count", 0) == 0
+]
 
 if constraints:
-    st.markdown("### 3. Run Validation")
+    st.markdown("### 4. Run Validation")
     st.caption("These checks will be validated against the loaded file data and saved as SQL-style history.")
 
     for index, constraint in enumerate(constraints, start=1):
@@ -1405,7 +1554,11 @@ if constraints:
         sql_queries = []
 
         for constraint in constraints:
-            table = get_table_by_id(parsed_tables, constraint["table_id"])
+            table = get_table_by_id(validation_tables, constraint["table_id"])
+
+            if table is None:
+                continue
+
             result = validate_constraint(
                 table,
                 constraint["column"],
@@ -1447,11 +1600,15 @@ if constraints:
 
 if st.session_state.get("last_validation_run"):
     run = st.session_state.last_validation_run
-    st.markdown("### 4. Review Result")
+    st.markdown("### 5. Review Result")
     status_method = st.success if run["status"] == "Passed" else st.error
     status_method(
         f"{run['status']}: {run['passed_constraints']} passed, "
         f"{run['failed_constraints']} failed"
+    )
+    st.caption(
+        "POC meaning: Passed means every checked row in the loaded attachment matched the rule. "
+        "It does not confirm Preprod/Production DB data until a real DB connection is added."
     )
     result_tab, sql_tab = st.tabs(["Validation Results", "Generated SQL"])
 
@@ -1466,9 +1623,25 @@ if st.session_state.get("last_validation_run"):
                 f"Passed {result['passed_rows']} | Failed {result['failed_rows']}"
             )
 
+            if result["status"] == "Passed":
+                st.info(
+                    "Evidence: no failing rows were found for this rule in the loaded file data."
+                )
+            else:
+                st.warning(
+                    "Evidence: at least one loaded row did not match this rule, so the check is not passed."
+                )
+
+            if result.get("value_counts"):
+                st.write("Actual values found in this column:")
+                st.dataframe(result["value_counts"], use_container_width=True, hide_index=True)
+
             if result["sample_failures"]:
                 st.write("Sample failed rows:")
                 st.dataframe(result["sample_failures"], use_container_width=True)
+            elif result.get("sample_passes"):
+                st.write("Sample passed rows:")
+                st.dataframe(result["sample_passes"], use_container_width=True)
 
     with sql_tab:
         for query in run["sql_queries"]:
