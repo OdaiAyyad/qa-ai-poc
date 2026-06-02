@@ -218,6 +218,48 @@ The data quality check should run before constraint building. If duplicated full
 
 This is intended to make the POC easier for managers and QA members to understand quickly.
 
+## Latest Phase 1 And Phase 3 Implementation Direction
+
+The product now follows the manager/supervisor three-phase vision more directly.
+
+### Phase 1: Ticket Data Validation Report
+
+The first phase validates the attachment data that comes with the Jira ticket before any DB/Metabase work.
+
+Current implemented POC behavior:
+
+- Parse ticket attachments.
+- Check duplicated rows per file/sheet.
+- Block only duplicated files/sheets while allowing clean files/sheets to continue.
+- Infer practical checks from ticket text and file columns.
+- Run a **Run Data Validation Report** action.
+- Produce a saved report with:
+  - duplicate check results
+  - inferred business/data checks
+  - pass/fail counts
+  - sample failed rows
+  - generated SQL-style queries
+
+This is not a replacement for all business-rule understanding yet, but it is the first automated report layer for validating whether ticket data is usable.
+
+### Phase 3: Natural-Language Data Question To SQL
+
+The previous optional natural-language helper is no longer the right product direction.
+
+It has been reframed as a mandatory Phase 3 concept:
+
+- QA writes a data question in natural language.
+- The app maps the question to a file/sheet column where possible.
+- The app generates a SQL-style read-only query.
+- The app runs the check against clean loaded file data in the POC.
+- The run is saved in ticket history as **Natural Language SQL Check**.
+
+The Phase 3 POC does not provide generic QA advice, regression suggestions, or ticket summaries. It is focused on converting a data question into a query/check.
+
+History should use ticket ID plus a short title, for example:
+
+`STF-7063 - Scholarship Discount`
+
 ## Desired Future Workflow
 
 ### 1. Ticket And File Parsing

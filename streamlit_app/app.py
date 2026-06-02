@@ -58,6 +58,32 @@ def get_ticket_topic(ticket_content):
     return "General investigation"
 
 
+def read_ticket_content(ticket_id):
+    try:
+        with open(f"tickets/{ticket_id}.txt", "r", encoding="utf-8") as file:
+            return file.read()
+    except:
+        return "Ticket not found."
+
+
+def get_short_ticket_title(ticket_content, max_words=5):
+    topic = get_ticket_topic(ticket_content)
+    cleaned_topic = re.sub(r"[^a-zA-Z0-9\u0600-\u06FF ]+", " ", topic)
+    words = [word for word in cleaned_topic.split() if len(word) > 1]
+
+    if not words:
+        return "General Investigation"
+
+    return " ".join(words[:max_words])
+
+
+def get_ticket_history_label(ticket_id, ticket_content=None):
+    if ticket_content is None:
+        ticket_content = read_ticket_content(ticket_id)
+
+    return f"{ticket_id} - {get_short_ticket_title(ticket_content)}"
+
+
 def get_available_tickets():
     try:
         ticket_files = [
@@ -564,6 +590,218 @@ def suggest_constraints_for_table(table):
     return suggestions
 
 
+def find_number_near_keywords(text, keywords):
+    lowered_text = text.lower()
+
+    for keyword in keywords:
+        for match in re.finditer(re.escape(keyword), lowered_text):
+            start = max(match.start() - 80, 0)
+            end = min(match.end() + 80, len(text))
+            window = text[start:end]
+            number_match = re.search(r"(\d+(?:\.\d+)?)\s*%?", window)
+
+            if number_match:
+                return number_match.group(1)
+
+    return None
+
+
+def infer_column_constraint(column, ticket_content):
+    column_lower = str(column).lower()
+    ticket_lower = ticket_content.lower()
+
+    if "gift" in column_lower:
+        if any(phrase in ticket_lower for phrase in ["no gift", "without gift", "gift id didn't", "gift id did not", "gift id not"]):
+            return ("is null", "", "Ticket says gift should not be linked")
+
+    if "scholarship" in column_lower and column_lower.endswith("id"):
+        return ("is not null", "", "Scholarship identifier should exist")
+
+    if column_lower.endswith("id") or "_id" in column_lower or column_lower == "id":
+        return ("is not null", "", "Identifier fields should not be missing")
+
+    if "mobile" in column_lower or "phone" in column_lower:
+        return ("is not null", "", "Contact identifier should not be missing")
+
+    if "status" in column_lower:
+        status_values = ["accepted", "active", "cancelled", "canceled", "completed", "pending", "rejected"]
+
+        for status in status_values:
+            if status in ticket_lower:
+                return ("equals", status.title(), "Status mentioned in ticket requirement")
+
+        return ("is not null", "", "Status should not be missing")
+
+    if any(keyword in column_lower for keyword in ["discount", "percentage", "amount"]):
+        expected_value = find_number_near_keywords(
+            ticket_content,
+            ["discount", "percentage", "amount", "scholarship"]
+        )
+
+        if expected_value:
+            return ("equals", expected_value, "Numeric value inferred from ticket requirement")
+
+        return ("is not null", "", "Financial/value column should not be missing")
+
+    return None
+
+
+def infer_phase1_constraints(ticket_content, tables):
+    constraints = []
+
+    for table in tables:
+        if table.get("duplicate_count", 0) > 0:
+            continue
+
+        for column in table.get("columns", []):
+            inferred_constraint = infer_column_constraint(column, ticket_content)
+
+            if not inferred_constraint:
+                continue
+
+            operator, expected_value, reason = inferred_constraint
+            constraints.append({
+                "table_id": table["id"],
+                "table_label": table["label"],
+                "file": table["file"],
+                "sheet": table["sheet"],
+                "column": column,
+                "operator": operator,
+                "expected_value": expected_value,
+                "reason": reason,
+            })
+
+            if len([
+                item
+                for item in constraints
+                if item["table_id"] == table["id"]
+            ]) >= 6:
+                break
+
+    return constraints
+
+
+def build_phase1_data_report(ticket, ticket_content, environment, parsed_tables):
+    validation_results = []
+    sql_queries = []
+    duplicate_results = []
+
+    for table in parsed_tables:
+        duplicate_count = table.get("duplicate_count", 0)
+        duplicate_results.append({
+            "table_label": table["label"],
+            "status": "Failed" if duplicate_count else "Passed",
+            "duplicate_count": duplicate_count,
+            "sample_failures": table.get("duplicate_samples", []),
+        })
+
+    clean_tables = [
+        table
+        for table in parsed_tables
+        if table.get("duplicate_count", 0) == 0
+    ]
+    inferred_constraints = infer_phase1_constraints(ticket_content, clean_tables)
+
+    for constraint in inferred_constraints:
+        table = get_table_by_id(clean_tables, constraint["table_id"])
+
+        if table is None:
+            continue
+
+        result = validate_constraint(
+            table,
+            constraint["column"],
+            constraint["operator"],
+            constraint["expected_value"]
+        )
+        sql_query = generate_constraint_sql(
+            table,
+            constraint["column"],
+            constraint["operator"],
+            constraint["expected_value"]
+        )
+        validation_results.append({
+            **constraint,
+            **result,
+            "sql": sql_query,
+        })
+        sql_queries.append(sql_query)
+
+    failed_constraints = sum(
+        1 for result in validation_results if result["status"] != "Passed"
+    )
+    failed_duplicates = sum(
+        1 for result in duplicate_results if result["status"] != "Passed"
+    )
+    passed_constraints = len(validation_results) - failed_constraints
+    run_status = "Passed" if failed_constraints == 0 and failed_duplicates == 0 else "Failed"
+
+    return {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "ticket": ticket,
+        "topic": get_short_ticket_title(ticket_content),
+        "environment": environment,
+        "status": run_status,
+        "run_type": "Phase 1 Data Report",
+        "constraints": inferred_constraints,
+        "results": validation_results,
+        "duplicate_results": duplicate_results,
+        "sql_queries": sql_queries,
+        "passed_constraints": passed_constraints,
+        "failed_constraints": failed_constraints + failed_duplicates,
+    }
+
+
+def infer_question_constraint(question, table):
+    question_lower = question.lower()
+    columns = table.get("columns", [])
+    selected_column = None
+
+    for column in columns:
+        column_lower = str(column).lower()
+
+        if column_lower in question_lower or column_lower.replace("_", " ") in question_lower:
+            selected_column = column
+            break
+
+    if not selected_column:
+        interesting_columns = get_interesting_columns(columns)
+        selected_column = interesting_columns[0] if interesting_columns else (columns[0] if columns else None)
+
+    if not selected_column:
+        return None
+
+    if any(phrase in question_lower for phrase in ["not null", "not missing", "available", "exists", "exist"]):
+        return selected_column, "is not null", ""
+
+    if any(phrase in question_lower for phrase in ["is null", "missing", "empty", "blank", "not exist"]):
+        return selected_column, "is null", ""
+
+    operator = "equals"
+
+    if any(phrase in question_lower for phrase in ["not equal", "not equals", "different from"]):
+        operator = "not equals"
+    elif any(phrase in question_lower for phrase in ["greater than", "more than", "above"]):
+        operator = "greater than"
+    elif any(phrase in question_lower for phrase in ["less than", "below", "under"]):
+        operator = "less than"
+    elif "contain" in question_lower:
+        operator = "contains"
+
+    value_match = re.search(r"['\"]([^'\"]+)['\"]", question)
+
+    if value_match:
+        expected_value = value_match.group(1)
+    else:
+        value_match = re.search(r"(\d+(?:\.\d+)?\s*%?)", question)
+        expected_value = value_match.group(1).strip() if value_match else ""
+
+    if operator not in ["is null", "is not null"] and not expected_value:
+        return selected_column, "is not null", ""
+
+    return selected_column, operator, expected_value
+
+
 def read_json_file(path, fallback):
     try:
         with open(path, "r", encoding="utf-8") as file:
@@ -601,19 +839,22 @@ def render_validation_history_sidebar():
     grouped_runs = {}
 
     for run in sorted_runs:
-        grouped_runs.setdefault(run.get("ticket", "Unknown Ticket"), []).append(run)
+        ticket_id = run.get("ticket", "Unknown Ticket")
+        topic = run.get("topic") or get_topic_for_ticket(ticket_id)
+        grouped_runs.setdefault(f"{ticket_id} - {topic}", []).append(run)
 
-    for ticket_id, ticket_runs in list(grouped_runs.items())[:8]:
-        with st.sidebar.expander(f"{ticket_id} ({len(ticket_runs)} runs)"):
+    for history_label, ticket_runs in list(grouped_runs.items())[:8]:
+        with st.sidebar.expander(f"{history_label} ({len(ticket_runs)} runs)"):
             for index, run in enumerate(ticket_runs[:8], start=1):
+                run_type = run.get("run_type", "Validation")
                 label = (
-                    f"Run {index}: {run.get('status', 'Status')} - "
+                    f"{index}. {run_type}: {run.get('status', 'Status')} - "
                     f"{run.get('environment', 'Env')}"
                 )
 
                 if st.button(
                     label,
-                    key=f"history_{ticket_id}_{run.get('timestamp', index)}",
+                    key=f"history_{history_label}_{run.get('timestamp', index)}",
                     use_container_width=True
                 ):
                     st.session_state.selected_history_run = run
@@ -1283,7 +1524,7 @@ st.markdown(
 )
 
 st.caption(
-    "Simple flow: select a ticket, load its file fields, add validation checks, then run and save the SQL-style result."
+    "Flow: load ticket data, run the Phase 1 data report, add manual checks if needed, then ask data questions that generate SQL-style results."
 )
 
 col1, col2 = st.columns(2)
@@ -1304,6 +1545,8 @@ with col2:
         st.warning("No ticket files found in the tickets folder.")
 
 ticket_attachments = get_ticket_attachments(ticket)
+ticket_content = read_ticket_content(ticket)
+ticket_topic = get_short_ticket_title(ticket_content)
 attachment_count = len(ticket_attachments)
 attachment_summary = ""
 parsed_attachment_count = 0
@@ -1316,6 +1559,7 @@ st.sidebar.markdown(
     f"""
     <div class="sidebar-context-card">
         <div class="context-row"><strong>Ticket</strong><span>{html.escape(ticket)}</span></div>
+        <div class="context-row"><strong>Title</strong><span>{html.escape(ticket_topic)}</span></div>
         <div class="context-row"><strong>Files</strong><span>{attachment_count}</span></div>
     </div>
     """,
@@ -1398,6 +1642,21 @@ if parsed_tables:
     with st.expander("Loaded file fields", expanded=True):
         st.dataframe(overview_rows, use_container_width=True, hide_index=True)
 
+    st.markdown("### 3. Run Phase 1 Data Report")
+    st.caption(
+        "This report validates the ticket files against basic data quality and business rules inferred from the ticket text."
+    )
+
+    if st.button("Run Data Validation Report", type="primary", use_container_width=True):
+        phase1_report = build_phase1_data_report(
+            ticket,
+            ticket_content,
+            "File Validation",
+            parsed_tables
+        )
+        save_validation_run(phase1_report)
+        st.session_state.last_validation_run = phase1_report
+
     if duplicate_tables:
         blocked_table_ids = {
             table["id"]
@@ -1432,7 +1691,7 @@ if parsed_tables:
         else:
             st.success("No duplicated rows found. You can continue to validation.")
 
-        st.markdown("### 3. Choose What To Validate")
+        st.markdown("### 4. Choose What To Validate")
 
         table_options = {
             table["label"]: table["id"]
@@ -1522,7 +1781,7 @@ validation_tables = [
 ]
 
 if constraints:
-    st.markdown("### 4. Run Validation")
+    st.markdown("### 5. Run Validation")
     st.caption("These checks will be validated against the loaded file data and saved as SQL-style history.")
 
     for index, constraint in enumerate(constraints, start=1):
@@ -1586,8 +1845,10 @@ if constraints:
         run_entry = {
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "ticket": ticket,
+            "topic": ticket_topic,
             "environment": environment,
             "status": run_status,
+            "run_type": "Manual Constraint Check",
             "constraints": constraints,
             "results": validation_results,
             "sql_queries": sql_queries,
@@ -1600,10 +1861,11 @@ if constraints:
 
 if st.session_state.get("last_validation_run"):
     run = st.session_state.last_validation_run
-    st.markdown("### 5. Review Result")
+    st.markdown("### 6. Review Result")
     status_method = st.success if run["status"] == "Passed" else st.error
     status_method(
-        f"{run['status']}: {run['passed_constraints']} passed, "
+        f"{run.get('run_type', 'Validation')}: {run['status']} - "
+        f"{run['passed_constraints']} passed, "
         f"{run['failed_constraints']} failed"
     )
     st.caption(
@@ -1613,11 +1875,36 @@ if st.session_state.get("last_validation_run"):
     result_tab, sql_tab = st.tabs(["Validation Results", "Generated SQL"])
 
     with result_tab:
+        if run.get("duplicate_results"):
+            st.markdown("#### Data Quality")
+
+            for duplicate_result in run["duplicate_results"]:
+                if duplicate_result["status"] == "Passed":
+                    st.success(f"{duplicate_result['table_label']}: no duplicated rows found")
+                else:
+                    st.error(
+                        f"{duplicate_result['table_label']}: "
+                        f"{duplicate_result['duplicate_count']} duplicated row(s)"
+                    )
+
+                    if duplicate_result.get("sample_failures"):
+                        st.dataframe(
+                            duplicate_result["sample_failures"],
+                            use_container_width=True,
+                            hide_index=True
+                        )
+
+        if run.get("results"):
+            st.markdown("#### Business/Data Checks")
+
         for result in run["results"]:
             st.markdown(
                 f"**{result['status']}** - `{result['column']}` "
                 f"{result['operator']} `{result['expected_value']}`"
             )
+            if result.get("reason"):
+                st.caption(f"Reason: {result['reason']}")
+
             st.caption(
                 f"Checked {result['checked_rows']} rows | "
                 f"Passed {result['passed_rows']} | Failed {result['failed_rows']}"
@@ -1665,178 +1952,90 @@ if selected_history_run:
         for query in selected_history_run.get("sql_queries", []):
             st.code(query, language="sql")
 
-with st.expander("Optional natural-language helper"):
-    st.caption("This helper does not create project history. Official saved history is based on SQL validation runs.")
+st.markdown("### 7. Ask Data Question To Generate SQL")
+st.caption(
+    "Phase 3 POC: write a data question, convert it to a SQL-style check, run it on the loaded clean file data, and save the result."
+)
 
-    if "question" not in st.session_state:
-        st.session_state.question = ""
-
-    question = st.text_area(
-        "Ask your QA question",
-        placeholder="Example: What should I regression test in STF-7063?",
-        key="question"
+if validation_tables:
+    phase3_table_options = {
+        table["label"]: table["id"]
+        for table in validation_tables
+    }
+    phase3_table_label = st.selectbox(
+        "File/sheet to query",
+        list(phase3_table_options.keys()),
+        key="phase3_table"
+    )
+    phase3_table = get_table_by_id(
+        validation_tables,
+        phase3_table_options[phase3_table_label]
     )
 
-    analyze_clicked = st.button(
-        "Analyze Impact",
-        type="primary",
-        use_container_width=True
+    if "data_question" not in st.session_state:
+        st.session_state.data_question = ""
+
+    data_question = st.text_area(
+        "Data question",
+        placeholder="Example: Is discount_percentage equal to 50 for all rows?",
+        key="data_question"
     )
 
-# ---------------- BUTTON ----------------
+    if st.button("Convert To SQL And Run", type="primary", use_container_width=True):
+        if not data_question.strip():
+            st.warning("Please enter a data question.")
+            st.stop()
 
-if analyze_clicked:
+        inferred_question_constraint = infer_question_constraint(data_question, phase3_table)
 
-    ticket_content = ""
+        if not inferred_question_constraint:
+            st.error("Could not map the question to a file column. Try mentioning the column name.")
+            st.stop()
 
-    try:
-        ticket = ticket.strip().upper()
-
-        with open(f"tickets/{ticket}.txt", "r", encoding="utf-8") as file:
-            ticket_content = file.read()
-    except:
-        ticket_content = "Ticket not found."
-
-    ticket_topic = get_ticket_topic(ticket_content)
-    attachment_summary = st.session_state.get("attachment_summary_by_ticket", "")
-
-    if ticket_attachments and not attachment_summary:
-        with st.spinner("Reading Excel/CSV attachments..."):
-            (
-                attachment_summary,
-                parsed_attachment_count,
-                unsupported_attachment_count
-            ) = build_attachment_content_summary(tuple(ticket_attachments))
-
-        st.session_state.attachment_summary_by_ticket = attachment_summary
-
-    prior_validation_runs = read_json_file(VALIDATION_HISTORY_FILE, [])
-    has_historical_context = any(
-        item.get("ticket") == ticket
-        for item in prior_validation_runs
-    )
-    confidence_score = calculate_confidence_score(
-        ticket_content,
-        attachment_count,
-        attachment_summary,
-        has_historical_context
-    )
-    data_sources = get_data_sources_used(
-        ticket_content,
-        ticket_attachments,
-        attachment_summary,
-        has_historical_context
-    )
-
-    # Empty question validation
-    if not question.strip():
-        st.warning("Please enter a question.")
-        st.stop()
-
-    prompt = f"""
-    You are an AI QA investigation assistant.
-
-    Your role is NOT to summarize tickets.
-
-    Your role is to help QA engineers identify:
-    - impacted areas
-    - affected modules
-    - possible database relations
-    - important validations
-    - risky logic dependencies
-
-    Environment:
-    {environment}
-
-    Ticket ID:
-    {ticket}
-
-    Ticket Content:
-    {ticket_content}
-
-    Attachments Found:
-    {attachment_count}
-
-    Parsed Tabular Attachments:
-    {parsed_attachment_count}
-
-    Attachment Content Summary:
-    {attachment_summary if attachment_summary else "No parsable Excel or CSV content found for this ticket."}
-
-    User Question:
-    {question}
-
-    IMPORTANT RULES:
-    - Keep answers concise and investigation-focused
-    - Avoid repeating ticket details
-    - Use bullet points
-    - Focus on actionable QA insights
-    - Infer likely DB tables/columns if applicable
-    - Mention possible hidden dependencies
-    - Include 3 to 6 concrete QA test scenarios when possible
-    - Suggest 2 to 4 read-only SQL SELECT queries when DB checks are relevant
-    - Do NOT suggest UPDATE, DELETE, INSERT, DROP, ALTER, TRUNCATE, or migration SQL
-    - Add a note that table and column names must be validated before execution
-    - Think like a senior QA investigator
-
-    VALIDATION RULES:
-
-    - If the question is unrelated to QA investigation, politely refuse.
-    - If the question is unrelated to the provided ticket context, explain that the investigation should stay related to the selected ticket.
-    - Do NOT answer general casual questions.
-    - Only answer questions related to:
-    - testing
-    - regression
-    - affected areas
-    - business logic
-    - DB impact
-    - APIs
-    - validations
-    - dependencies
-    - investigations
-
-    Response Format:
-
-    ## Affected Areas
-    - ...
-
-    ## Important DB Checks
-    - ...
-
-    ## Risky Dependencies
-    - ...
-
-    ## Suggested Investigation
-    - ...
-
-    ## Suggested Test Scenarios
-    - ...
-
-    ## Suggested SQL Queries
-    - Purpose: ...
-    ```sql
-    SELECT ...
-    ```
-
-    ## Regression Focus
-    - ...
-    """
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    st.success("Analysis Generated Successfully")
-
-    st.markdown("## 🧠 AI Analysis")
-
-    ai_response = response.choices[0].message.content
-
-    render_grounding_panel(confidence_score, data_sources)
-    render_ai_analysis(ai_response)
-
+        question_column, question_operator, question_expected_value = inferred_question_constraint
+        question_result = validate_constraint(
+            phase3_table,
+            question_column,
+            question_operator,
+            question_expected_value
+        )
+        question_sql = generate_constraint_sql(
+            phase3_table,
+            question_column,
+            question_operator,
+            question_expected_value
+        )
+        question_constraint = {
+            "table_id": phase3_table["id"],
+            "table_label": phase3_table["label"],
+            "file": phase3_table["file"],
+            "sheet": phase3_table["sheet"],
+            "column": question_column,
+            "operator": question_operator,
+            "expected_value": question_expected_value,
+            "question": data_question,
+        }
+        question_run = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "ticket": ticket,
+            "topic": ticket_topic,
+            "environment": "File Validation",
+            "status": question_result["status"],
+            "run_type": "Natural Language SQL Check",
+            "question": data_question,
+            "constraints": [question_constraint],
+            "results": [{
+                **question_constraint,
+                **question_result,
+                "reason": "Generated from natural-language data question",
+                "sql": question_sql,
+            }],
+            "sql_queries": [question_sql],
+            "passed_constraints": 1 if question_result["status"] == "Passed" else 0,
+            "failed_constraints": 0 if question_result["status"] == "Passed" else 1,
+        }
+        save_validation_run(question_run)
+        st.session_state.last_validation_run = question_run
+        st.rerun()
+else:
+    st.info("Load ticket fields first. Phase 3 can run only on clean files/sheets in this POC.")
