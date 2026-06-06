@@ -1,0 +1,6 @@
+student_id,scholarship_id,discount_amount,status
+1001,SCH-001,100,True
+1002,SCH-002,100,True
+1003,SCH-003,50,True
+1004,SCH-004,100,False
+1004,SCH-004,100,False

@@ -1,0 +1,14 @@
+Scholarship Failure Demo
+
+Business Requirement:
+All listed scholarship migration records must have discount_amount equal to 100.
+
+Data Quality Requirement:
+The attached data must not contain duplicated rows.
+
+Validation Notes:
+- student_id must be available for every row.
+- scholarship_id must be available for every row.
+- discount_amount must equal 100 for every row.
+- status must be true for every row.
+

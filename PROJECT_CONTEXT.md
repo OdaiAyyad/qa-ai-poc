@@ -210,11 +210,20 @@ Current simplified UI direction:
 4. Keep the main page as the workflow.
    - 1. Load Ticket Data
    - 2. Data Quality Check
-   - 3. Choose What To Validate
-   - 4. Run Validation
-   - 5. Review Result
+   - 3. Run Phase 1 Data Report
+   - Manual Checks, only after the Phase 1 report is complete
+   - Ask Data Question To Generate SQL, only after the Phase 1 report is complete
 
 The data quality check should run before constraint building. If duplicated full rows are found in a parsed attachment table, the app should block only that duplicated file/sheet, show duplicate samples, remove pending constraints for the blocked file/sheet, and still allow validation on other clean files/sheets under the same ticket. If every file/sheet has duplicates, the app should refuse validation until at least one clean file/sheet is available.
+
+The UI should be progressive. Do not show Phase 3 or later actions in the first screen before attachments are loaded and the Phase 1 report has been run. Each phase should show its own output directly below the phase action that created it:
+
+- Phase 1 output below **Run Data Validation Report**
+- Manual check output below **Run SQL Validation Check**
+- Phase 2 output below **Create DB Validation Plan**
+- Phase 3 output below **Convert To SQL And Run**
+
+Outputs should be compact summary panels with optional expanders for failed evidence and generated SQL, not long always-open sections. History still saves all runs, but the main working view should keep phase outputs near their related phase so users do not lose context.
 
 This is intended to make the POC easier for managers and QA members to understand quickly.
 
@@ -242,6 +251,25 @@ Current implemented POC behavior:
 
 This is not a replacement for all business-rule understanding yet, but it is the first automated report layer for validating whether ticket data is usable.
 
+### Phase 2: DB/Metabase Validation Plan
+
+The second phase is represented in the POC as a planned execution layer because DB/Metabase access is not available yet.
+
+Current implemented POC behavior:
+
+- Takes generated read-only SQL from the latest validation run.
+- Lets QA choose the target environment: Preprod or Production.
+- Saves a **Phase 2 DB/Metabase Plan** history run.
+- Marks the queries as **Not Executed** and **Not Connected**.
+- Does not fake DB results.
+
+Future behavior:
+
+- Connect to DB/Metabase.
+- Execute only read-only SQL.
+- Compare DB output with ticket/file validation expectations.
+- Save actual DB evidence and environment status.
+
 ### Phase 3: Natural-Language Data Question To SQL
 
 The previous optional natural-language helper is no longer the right product direction.
@@ -259,6 +287,32 @@ The Phase 3 POC does not provide generic QA advice, regression suggestions, or t
 History should use ticket ID plus a short title, for example:
 
 `STF-7063 - Scholarship Discount`
+
+## New Ticket Intake Direction
+
+The system should support non-technical QA users adding new tickets without editing files manually.
+
+Current implemented POC behavior:
+
+- UI section: **Add New Ticket**
+- User enters:
+  - Ticket ID
+  - Short title
+  - Business requirements
+  - Optional validation notes
+  - CSV/XLSX/TXT attachments
+- The app saves:
+  - ticket text into `tickets/{ticket_id}.txt`
+  - uploaded files into `attachments/`
+- Attachment filenames are automatically prefixed with the ticket ID when needed.
+- The normal validation flow can then load the newly added ticket.
+
+Important product clarification:
+
+- This is not model fine-tuning.
+- The model does not permanently learn from new tickets by itself.
+- The POC "learns" operationally by saving ticket files, attachments, validation runs, SQL plans, and natural-language SQL checks.
+- Future semantic learning can be added with RAG/vector search over tickets, attachments, history, and approved validation examples.
 
 ## Desired Future Workflow
 
