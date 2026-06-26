@@ -932,7 +932,7 @@ def build_phase2_db_plan(ticket, ticket_topic, target_environment, source_run):
             "query": query,
             "purpose": f"DB validation query {index}",
             "status": "Not Executed",
-            "note": "DB/Metabase connection is not configured in this POC.",
+            "note": "AI does not execute this query. QA/DB owner must review and run it in an approved tool.",
         })
 
     return {
@@ -941,8 +941,8 @@ def build_phase2_db_plan(ticket, ticket_topic, target_environment, source_run):
         "topic": ticket_topic,
         "environment": target_environment,
         "status": "Needs Review",
-        "run_type": "Phase 2 DB/Metabase Plan",
-        "execution_status": "Not Connected",
+        "run_type": "Phase 2 Safe SQL Review Plan",
+        "execution_status": "Awaiting Human Review",
         "source_run_type": source_run.get("run_type", "Validation"),
         "constraints": source_run.get("constraints", []),
         "results": [],
@@ -1075,7 +1075,7 @@ def render_validation_history_sidebar():
                     if run_type == "Phase 1 Data Report":
                         st.session_state.phase1_run = run
                         st.session_state.phase1_report_done = True
-                    elif run_type == "Phase 2 DB/Metabase Plan":
+                    elif run_type in ["Phase 2 DB/Metabase Plan", "Phase 2 Safe SQL Review Plan"]:
                         st.session_state.phase2_run = run
                     elif run_type == "Natural Language SQL Check":
                         st.session_state.phase3_run = run
@@ -1107,7 +1107,7 @@ def render_compact_run_result(run, title="Output"):
         unsafe_allow_html=True
     )
     st.caption(
-        "POC result is based on loaded attachment data only. DB/Metabase execution is not connected yet."
+        "POC result is based on loaded attachment data only. AI does not directly access or execute against DB/Metabase."
     )
 
     summary_rows = []
@@ -1599,7 +1599,12 @@ st.sidebar.title("QA SQL Validation Assistant")
 st.title("🔎 QA SQL Validation Assistant")
 
 st.markdown(
-    "Understand ticket data, define critical constraints, and generate SQL-style validation evidence."
+    "Validate ticket data safely, generate SQL for human review, and reuse QA knowledge without direct AI database access."
+)
+
+st.info(
+    "Safety mode: the AI does not receive DB credentials and does not execute SQL. "
+    "It works on Jira ticket text, uploaded files, saved history, and generated read-only SQL for human review."
 )
 
 st.markdown(
@@ -1872,8 +1877,22 @@ st.markdown(
 )
 
 st.caption(
-    "Flow: load ticket data, run the Phase 1 data report, add manual checks if needed, then ask data questions that generate SQL-style results."
+    "Flow: add/load ticket data, run the Phase 1 data report, prepare safe SQL for review, then ask data questions against loaded files."
 )
+
+with st.expander("Future: n8n + Qdrant Integration", expanded=False):
+    st.caption(
+        "For this same project, n8n can automate ticket intake and Qdrant can become searchable QA memory."
+    )
+    st.markdown(
+        """
+        - n8n can pull Jira ticket text and attachments automatically.
+        - Qdrant can store similar tickets, approved SQL, previous failures, and validation reports.
+        - The app can retrieve similar past cases before generating checks.
+        - This is RAG-style memory, not model fine-tuning.
+        - DB execution should remain a controlled human-approved step.
+        """
+    )
 
 with st.expander("Add New Ticket", expanded=False):
     st.caption(
@@ -2316,19 +2335,19 @@ if st.session_state.get("manual_run"):
 latest_run = st.session_state.get("manual_run") or st.session_state.get("phase1_run")
 
 if latest_run and st.session_state.get("phase1_report_done", False):
-    st.markdown("### Phase 2: DB/Metabase Validation Plan")
+    st.markdown("### Phase 2: Safe SQL Review Plan")
     st.caption(
-        "No DB/Metabase connection is configured yet. This step prepares the read-only queries that should run later in Preprod or Production."
+        "AI does not connect to DB/Metabase. This step prepares read-only SQL for QA/DB-owner review and approved execution outside the app."
     )
     phase2_environment = st.selectbox(
-        "Target environment for planned DB validation",
+        "Target environment for reviewed SQL",
         ["Preprod", "Production"],
         key="phase2_environment"
     )
     can_plan_db = bool(latest_run.get("sql_queries"))
 
     if st.button(
-        "Create DB Validation Plan",
+        "Create SQL Review Plan",
         use_container_width=True,
         disabled=not can_plan_db
     ):
@@ -2340,7 +2359,7 @@ if latest_run and st.session_state.get("phase1_report_done", False):
         )
         save_validation_run(phase2_plan)
         st.session_state.phase2_run = phase2_plan
-        st.toast("DB/Metabase validation plan saved.")
+        st.toast("Safe SQL review plan saved.")
 
     if not can_plan_db:
         st.caption("No SQL is available from the latest run yet.")
@@ -2354,7 +2373,7 @@ if latest_run and st.session_state.get("phase1_report_done", False):
 if validation_tables and st.session_state.get("phase1_report_done", False):
     st.markdown("### Phase 3: Ask Data Question To Generate SQL")
     st.caption(
-        "These options come from the clean sheets parsed from the selected ticket attachments. Ask about columns shown in Loaded file fields."
+        "This runs only on clean loaded ticket files in the POC. It does not query DB/Metabase."
     )
     phase3_table_options = {
         table["label"]: table["id"]

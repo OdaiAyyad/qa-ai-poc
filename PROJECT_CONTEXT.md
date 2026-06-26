@@ -251,17 +251,17 @@ Current implemented POC behavior:
 
 This is not a replacement for all business-rule understanding yet, but it is the first automated report layer for validating whether ticket data is usable.
 
-### Phase 2: DB/Metabase Validation Plan
+### Phase 2: Safe SQL Review Plan
 
-The second phase is represented in the POC as a planned execution layer because DB/Metabase access is not available yet.
+The second phase is represented in the POC as a safe SQL review/handoff layer. AI should not directly connect to DB/Metabase or execute SQL.
 
 Current implemented POC behavior:
 
 - Takes generated read-only SQL from the latest validation run.
 - Lets QA choose the target environment: Preprod or Production.
-- Saves a **Phase 2 DB/Metabase Plan** history run.
-- Marks the queries as **Not Executed** and **Not Connected**.
-- Does not fake DB results.
+- Saves a **Phase 2 Safe SQL Review Plan** history run.
+- Marks the queries as **Not Executed** and **Awaiting Human Review**.
+- Does not fake DB results and does not run SQL directly.
 
 Future behavior:
 
@@ -287,6 +287,21 @@ The Phase 3 POC does not provide generic QA advice, regression suggestions, or t
 History should use ticket ID plus a short title, for example:
 
 `STF-7063 - Scholarship Discount`
+
+## Safe Architecture Direction
+
+The safer product direction is to avoid giving the AI direct database credentials or direct SQL execution authority.
+
+Current UI/product framing:
+
+- AI validates ticket text and uploaded files.
+- AI generates read-only SQL suggestions.
+- Phase 2 prepares a safe SQL review plan for QA/DB-owner approval.
+- SQL execution remains outside the app unless the company later approves a controlled, audited path.
+- n8n can automate Jira/ticket ingestion.
+- Qdrant can provide RAG memory over old tickets, attachments, validation reports, approved SQL, and known failures.
+
+This keeps the project relevant to QA while reducing DB-access risk.
 
 ## New Ticket Intake Direction
 

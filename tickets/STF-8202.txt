@@ -1,0 +1,15 @@
+Interactive Session Link
+
+Business Requirements:
+We need to add interactive links to selected courses.
+
+The interactive links should be displayed to students within the corresponding course.
+
+Students who are enrolled in the course should be able to access the interactive link and the recorded link directly from the course page.
+
+Acceptance Criteria
+The interactive link is displayed on the course page.
+
+Only enrolled students can view and access the interactive link.
+
+If no link is found, the interactive button is not displayed.

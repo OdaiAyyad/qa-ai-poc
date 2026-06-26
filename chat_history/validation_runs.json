@@ -7884,5 +7884,61 @@
         ],
         "passed_constraints": 0,
         "failed_constraints": 1
+    },
+    {
+        "timestamp": "2026-06-06T23:15:11",
+        "ticket": "STF-8202",
+        "topic": "Interactive Session Link",
+        "environment": "File Validation",
+        "status": "Passed",
+        "run_type": "Phase 1 Data Report",
+        "constraints": [],
+        "results": [],
+        "duplicate_results": [
+            {
+                "table_label": "STF-8202-تفاعلي  (2).xlsx / 2009",
+                "status": "Passed",
+                "duplicate_count": 0,
+                "sample_failures": []
+            },
+            {
+                "table_label": "STF-8202-تفاعلي  (2).xlsx / 2008",
+                "status": "Passed",
+                "duplicate_count": 0,
+                "sample_failures": []
+            }
+        ],
+        "sql_queries": [],
+        "passed_constraints": 0,
+        "failed_constraints": 0,
+        "review_constraints": 0
+    },
+    {
+        "timestamp": "2026-06-26T14:21:50",
+        "ticket": "STF-8202",
+        "topic": "Interactive Session Link",
+        "environment": "File Validation",
+        "status": "Passed",
+        "run_type": "Phase 1 Data Report",
+        "constraints": [],
+        "results": [],
+        "duplicate_results": [
+            {
+                "table_label": "STF-8202-تفاعلي  (2).xlsx / 2009",
+                "status": "Passed",
+                "duplicate_count": 0,
+                "sample_failures": []
+            },
+            {
+                "table_label": "STF-8202-تفاعلي  (2).xlsx / 2008",
+                "status": "Passed",
+                "duplicate_count": 0,
+                "sample_failures": []
+            }
+        ],
+        "sql_queries": [],
+        "passed_constraints": 0,
+        "failed_constraints": 0,
+        "review_constraints": 0
     }
 ]
